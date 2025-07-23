@@ -22,10 +22,15 @@
       width: auto;
       padding: 10px 20px;
     }
+    .warning {
+      color: red;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
+  <p id="entryLabel"></p>
   <form id="carForm">
     <label for="vin">VIN or Plate Number</label>
     <input type="text" id="vin" required />
@@ -58,6 +63,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
+    // 1. Firebase setup
     const firebaseConfig = {
       apiKey: "YOUR_API_KEY",
       authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
@@ -70,10 +76,23 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const form = document.getElementById("carForm");
-    const statusMsg = document.getElementById("statusMsg");
+    // 2. Get unique ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const itemId = urlParams.get("id");
 
-    form.addEventListener("submit", async (e) => {
+    const statusMsg = document.getElementById("statusMsg");
+    const entryLabel = document.getElementById("entryLabel");
+
+    if (!itemId) {
+      entryLabel.innerHTML = '<span class="warning">⚠️ No ID specified in URL. Example: ?id=YOURCAR123</span>';
+      document.getElementById("carForm").style.display = "none";
+    } else {
+      entryLabel.textContent = `Logging entries for: ${itemId}`;
+    }
+
+    const form = document.getElementById("carForm");
+
+    form?.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const vin = document.getElementById("vin").value.trim();
@@ -83,7 +102,8 @@
       const notes = document.getElementById("notes").value;
 
       try {
-        await db.collection("carLogs").add({
+        const entryRef = db.collection("carLogs").doc(itemId).collection("entries");
+        await entryRef.add({
           vin,
           serviceDate,
           serviceType,
@@ -91,11 +111,12 @@
           notes,
           timestamp: new Date()
         });
-        statusMsg.textContent = "Entry saved successfully!";
+
+        statusMsg.textContent = "✅ Entry saved successfully!";
         form.reset();
       } catch (err) {
         console.error("Error adding document: ", err);
-        statusMsg.textContent = "Error saving entry.";
+        statusMsg.textContent = "❌ Error saving entry.";
       }
     });
   </script>
