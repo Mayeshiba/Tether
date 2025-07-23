@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Furnace Maintenance Log</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+    label, input, textarea, button {
+      display: block;
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    input, textarea {
+      width: 300px;
+      padding: 8px;
+    }
+    button {
+      width: auto;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Furnace Maintenance Log</h1>
+  <form id="furnaceForm">
+    <label for="serial">Furnace Serial Number</label>
+    <input type="text" id="serial" required />
+
+    <label for="serviceDate">Date of Service</label>
+    <input type="date" id="serviceDate" required />
+
+    <label for="performedBy">Serviced By</label>
+    <input type="text" id="performedBy" />
+
+    <label for="serviceDetails">Service Details</label>
+    <textarea id="serviceDetails" rows="4"></textarea>
+
+    <label for="filterChanged">Filter Changed?</label>
+    <select id="filterChanged">
+      <option value="Yes">Yes</option>
+      <option value="No">No</option>
+    </select>
+
+    <button type="submit">Save Entry</button>
+  </form>
+
+  <p id="statusMsg"></p>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const form = document.getElementById("furnaceForm");
+    const statusMsg = document.getElementById("statusMsg");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const serial = document.getElementById("serial").value.trim();
+      const serviceDate = document.getElementById("serviceDate").value;
+      const performedBy = document.getElementById("performedBy").value.trim();
+      const serviceDetails = document.getElementById("serviceDetails").value;
+      const filterChanged = document.getElementById("filterChanged").value;
+
+      try {
+        await db.collection("furnaceLogs").add({
+          serial,
+          serviceDate,
+          performedBy,
+          serviceDetails,
+          filterChanged,
+          timestamp: new Date()
+        });
+        statusMsg.textContent = "Entry saved successfully!";
+        form.reset();
+      } catch (err) {
+        console.error("Error adding document: ", err);
+        statusMsg.textContent = "Error saving entry.";
+      }
+    });
+  </script>
+</body>
+</html>
