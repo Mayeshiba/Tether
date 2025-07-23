@@ -3,57 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tether – Landing Page</title>
+  <title>Select Log Template</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      margin: 40px;
+      padding: 60px;
     }
     h1 {
-      color: #333;
+      font-size: 28px;
+      margin-bottom: 30px;
     }
-    .template-link {
-      display: inline-block;
-      margin: 15px;
-      padding: 15px 25px;
-      background-color: #007bff;
-      color: white;
-      text-decoration: none;
-      border-radius: 5px;
+    button {
+      display: block;
+      margin: 15px auto;
+      padding: 15px 30px;
       font-size: 18px;
+      border: none;
+      border-radius: 6px;
+      background-color: #1976d2;
+      color: white;
+      cursor: pointer;
     }
-    .template-link:hover {
-      background-color: #0056b3;
+    button:hover {
+      background-color: #125ea0;
     }
   </style>
 </head>
 <body>
-  <h1>Welcome to Tether</h1>
-  <p>Select a log template to begin:</p>
+  <h1>Welcome! What would you like to log?</h1>
 
-  <a class="template-link" href="carMaintenance.html">🚗 Car Maintenance Log</a>
-  <a class="template-link" href="furnaceLog.html">🌀 Furnace Filter Log</a>
-
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script>
-    // TODO: Replace with your Firebase project config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    // Optional: Basic test of DB (for dev only)
-    console.log("Firebase connected:", db);
-  </script>
+  <button onclick="location.href='car_maintenance.html'">🚗 Car Maintenance</button>
+  <button onclick="location.href='furnace_log.html'">🛠️ Furnace Filter</button>
 </body>
 </html>
