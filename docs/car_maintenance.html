@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Car Maintenance Log</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+    label, input, textarea, select, button {
+      display: block;
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    input, textarea, select {
+      width: 300px;
+      padding: 8px;
+    }
+    button {
+      width: auto;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Car Maintenance Log</h1>
+  <form id="carForm">
+    <label for="vin">VIN or Plate Number</label>
+    <input type="text" id="vin" required />
+
+    <label for="serviceDate">Date of Service</label>
+    <input type="date" id="serviceDate" required />
+
+    <label for="serviceType">Service Performed</label>
+    <select id="serviceType">
+      <option>Oil Change</option>
+      <option>Tire Rotation</option>
+      <option>Brake Check</option>
+      <option>Fluid Refill</option>
+      <option>Battery Replacement</option>
+      <option>Other</option>
+    </select>
+
+    <label for="cost">Cost ($)</label>
+    <input type="number" id="cost" step="0.01" />
+
+    <label for="notes">Notes</label>
+    <textarea id="notes" rows="4"></textarea>
+
+    <button type="submit">Save Entry</button>
+  </form>
+
+  <p id="statusMsg"></p>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const form = document.getElementById("carForm");
+    const statusMsg = document.getElementById("statusMsg");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const vin = document.getElementById("vin").value.trim();
+      const serviceDate = document.getElementById("serviceDate").value;
+      const serviceType = document.getElementById("serviceType").value;
+      const cost = parseFloat(document.getElementById("cost").value);
+      const notes = document.getElementById("notes").value;
+
+      try {
+        await db.collection("carLogs").add({
+          vin,
+          serviceDate,
+          serviceType,
+          cost,
+          notes,
+          timestamp: new Date()
+        });
+        statusMsg.textContent = "Entry saved successfully!";
+        form.reset();
+      } catch (err) {
+        console.error("Error adding document: ", err);
+        statusMsg.textContent = "Error saving entry.";
+      }
+    });
+  </script>
+</body>
+</html>
