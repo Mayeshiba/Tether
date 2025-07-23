@@ -12,5 +12,28 @@
     <li><a href="furnace-log.html">🛠 Furnace Filter Log</a></li>
   </ul>
   <p>Each template helps track real-world tasks and maintenance.</p>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+    authDomain: "tether-71e0c.firebaseapp.com",
+    projectId: "tether-71e0c",
+    storageBucket: "tether-71e0c.firebasestorage.app",
+    messagingSenderId: "277809008742",
+    appId: "1:277809008742:web:2586a2b821d8da8f969da7",
+    measurementId: "G-X7ZQ6DJYEN"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
 </body>
 </html>
