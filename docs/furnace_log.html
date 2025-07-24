@@ -1,63 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Furnace Filter Log</title>
+  <meta charset="UTF-8">
+  <title>Furnace Maintenance Log</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
+      font-family: sans-serif;
+      padding: 40px;
+      max-width: 600px;
+      margin: auto;
     }
-    label, input, textarea, button {
+    label {
       display: block;
-      margin: 10px 0;
+      margin-top: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
       font-size: 16px;
     }
-    input, textarea {
-      width: 300px;
-      padding: 8px;
-    }
     button {
-      width: auto;
-      padding: 10px 20px;
-    }
-    .warning {
-      color: red;
-      font-weight: bold;
+      margin-top: 30px;
     }
   </style>
 </head>
 <body>
-  <h1>Furnace Filter Replacement Log</h1>
-  <p id="entryLabel"></p>
+  <h1>Furnace Log</h1>
 
-  <form id="furnaceForm">
-    <label for="replacementDate">Date Replaced</label>
-    <input type="date" id="replacementDate" required />
+  <label>Furnace Type:</label>
+  <input id="furnaceType" placeholder="e.g. Lennox Gas Furnace" />
 
-    <label for="filterBrand">Filter Brand</label>
-    <input type="text" id="filterBrand" />
+  <label>Address:</label>
+  <input id="address" placeholder="e.g. 123 Main St, Springfield" />
 
-    <label for="filterCost">Filter Cost ($)</label>
-    <input type="number" id="filterCost" step="0.01" />
+  <button onclick="saveFurnaceDetails()">Save</button>
 
-    <label for="notes">Notes</label>
-    <textarea id="notes" rows="4"></textarea>
-
-    <button type="submit">Save Entry</button>
-  </form>
-
-  <p id="statusMsg"></p>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // 1. Firebase setup
     const firebaseConfig = {
       apiKey: "YOUR_API_KEY",
       authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
       projectId: "YOUR_PROJECT_ID",
       storageBucket: "YOUR_PROJECT_ID.appspot.com",
       messagingSenderId: "YOUR_SENDER_ID",
@@ -65,49 +49,33 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const db = firebase.database();
 
-    // 2. Get unique ID from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const itemId = urlParams.get("id");
+    const id = urlParams.get('id');
 
-    const statusMsg = document.getElementById("statusMsg");
-    const entryLabel = document.getElementById("entryLabel");
+    const pageRef = db.ref('pages/' + id);
 
-    if (!itemId) {
-      entryLabel.innerHTML = '<span class="warning">⚠️ No ID specified in URL. Example: ?id=FURNACE001</span>';
-      document.getElementById("furnaceForm").style.display = "none";
-    } else {
-      entryLabel.textContent = `Logging entries for: ${itemId}`;
-    }
-
-    const form = document.getElementById("furnaceForm");
-
-    form?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const replacementDate = document.getElementById("replacementDate").value;
-      const filterBrand = document.getElementById("filterBrand").value.trim();
-      const filterCost = parseFloat(document.getElementById("filterCost").value);
-      const notes = document.getElementById("notes").value;
-
-      try {
-        const entryRef = db.collection("furnaceLogs").doc(itemId).collection("entries");
-        await entryRef.add({
-          replacementDate,
-          filterBrand,
-          filterCost,
-          notes,
-          timestamp: new Date()
-        });
-
-        statusMsg.textContent = "✅ Entry saved successfully!";
-        form.reset();
-      } catch (err) {
-        console.error("Error adding document: ", err);
-        statusMsg.textContent = "❌ Error saving entry.";
+    // Load existing data
+    pageRef.once('value').then(snapshot => {
+      const data = snapshot.val();
+      if (data) {
+        document.getElementById('furnaceType').value = data.furnaceType || '';
+        document.getElementById('address').value = data.address || '';
       }
     });
+
+    function saveFurnaceDetails() {
+      const updates = {
+        furnaceType: document.getElementById('furnaceType').value,
+        address: document.getElementById('address').value
+      };
+      pageRef.update(updates).then(() => {
+        alert("Furnace details saved.");
+      }).catch(error => {
+        alert("Error saving: " + error);
+      });
+    }
   </script>
 </body>
 </html>
