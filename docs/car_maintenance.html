@@ -1,72 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>Car Maintenance Log</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
+      font-family: sans-serif;
+      padding: 40px;
+      max-width: 600px;
+      margin: auto;
     }
-    label, input, textarea, select, button {
+    label {
       display: block;
-      margin: 10px 0;
+      margin-top: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
       font-size: 16px;
     }
-    input, textarea, select {
-      width: 300px;
-      padding: 8px;
-    }
     button {
-      width: auto;
-      padding: 10px 20px;
-    }
-    .warning {
-      color: red;
-      font-weight: bold;
+      margin-top: 30px;
     }
   </style>
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
-  <p id="entryLabel"></p>
-  <form id="carForm">
-    <label for="vin">VIN or Plate Number</label>
-    <input type="text" id="vin" required />
 
-    <label for="serviceDate">Date of Service</label>
-    <input type="date" id="serviceDate" required />
+  <label>Car Type:</label>
+  <input id="carType" placeholder="e.g. Toyota Camry" />
 
-    <label for="serviceType">Service Performed</label>
-    <select id="serviceType">
-      <option>Oil Change</option>
-      <option>Tire Rotation</option>
-      <option>Brake Check</option>
-      <option>Fluid Refill</option>
-      <option>Battery Replacement</option>
-      <option>Other</option>
-    </select>
+  <label>License Plate Number:</label>
+  <input id="plateNumber" placeholder="e.g. ABC1234" />
 
-    <label for="cost">Cost ($)</label>
-    <input type="number" id="cost" step="0.01" />
+  <label>VIN Number:</label>
+  <input id="vinNumber" placeholder="e.g. 1HGCM82633A123456" />
 
-    <label for="notes">Notes</label>
-    <textarea id="notes" rows="4"></textarea>
+  <button onclick="saveCarDetails()">Save</button>
 
-    <button type="submit">Save Entry</button>
-  </form>
-
-  <p id="statusMsg"></p>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
-    // 1. Firebase setup
     const firebaseConfig = {
       apiKey: "YOUR_API_KEY",
       authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
       projectId: "YOUR_PROJECT_ID",
       storageBucket: "YOUR_PROJECT_ID.appspot.com",
       messagingSenderId: "YOUR_SENDER_ID",
@@ -74,51 +52,35 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const db = firebase.database();
 
-    // 2. Get unique ID from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const itemId = urlParams.get("id");
+    const id = urlParams.get('id');
 
-    const statusMsg = document.getElementById("statusMsg");
-    const entryLabel = document.getElementById("entryLabel");
+    const pageRef = db.ref('pages/' + id);
 
-    if (!itemId) {
-      entryLabel.innerHTML = '<span class="warning">⚠️ No ID specified in URL. Example: ?id=YOURCAR123</span>';
-      document.getElementById("carForm").style.display = "none";
-    } else {
-      entryLabel.textContent = `Logging entries for: ${itemId}`;
-    }
-
-    const form = document.getElementById("carForm");
-
-    form?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const vin = document.getElementById("vin").value.trim();
-      const serviceDate = document.getElementById("serviceDate").value;
-      const serviceType = document.getElementById("serviceType").value;
-      const cost = parseFloat(document.getElementById("cost").value);
-      const notes = document.getElementById("notes").value;
-
-      try {
-        const entryRef = db.collection("carLogs").doc(itemId).collection("entries");
-        await entryRef.add({
-          vin,
-          serviceDate,
-          serviceType,
-          cost,
-          notes,
-          timestamp: new Date()
-        });
-
-        statusMsg.textContent = "✅ Entry saved successfully!";
-        form.reset();
-      } catch (err) {
-        console.error("Error adding document: ", err);
-        statusMsg.textContent = "❌ Error saving entry.";
+    // Load existing data if present
+    pageRef.once('value').then(snapshot => {
+      const data = snapshot.val();
+      if (data) {
+        document.getElementById('carType').value = data.carType || '';
+        document.getElementById('plateNumber').value = data.plateNumber || '';
+        document.getElementById('vinNumber').value = data.vinNumber || '';
       }
     });
+
+    function saveCarDetails() {
+      const updates = {
+        carType: document.getElementById('carType').value,
+        plateNumber: document.getElementById('plateNumber').value,
+        vinNumber: document.getElementById('vinNumber').value
+      };
+      pageRef.update(updates).then(() => {
+        alert("Car details saved.");
+      }).catch(error => {
+        alert("Error saving: " + error);
+      });
+    }
   </script>
 </body>
 </html>
