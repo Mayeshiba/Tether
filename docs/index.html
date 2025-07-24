@@ -1,39 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Log Template</title>
+  <meta charset="UTF-8">
+  <title>QR Page Selector</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 60px;
-    }
-    h1 {
-      font-size: 28px;
-      margin-bottom: 30px;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 100px;
     }
     button {
-      display: block;
-      margin: 15px auto;
       padding: 15px 30px;
+      margin: 20px;
       font-size: 18px;
-      border: none;
-      border-radius: 6px;
-      background-color: #1976d2;
-      color: white;
       cursor: pointer;
-    }
-    button:hover {
-      background-color: #125ea0;
     }
   </style>
 </head>
 <body>
-  <h1>Welcome! What would you like to log?</h1>
+  <h1>Select Template Type</h1>
+  <button onclick="createPage('car')">Car Maintenance</button>
+  <button onclick="createPage('furnace')">Furnace Log</button>
 
-  <button onclick="location.href='car_maintenance.html'">🚗 Car Maintenance</button>
-  <button onclick="location.href='furnace_log.html'">🛠️ Furnace Filter</button>
+  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function createUUID() {
+      return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function createPage(type) {
+      const id = createUUID();
+      const pageData = {
+        type: type,
+        created_at: new Date().toISOString()
+      };
+      db.ref('pages/' + id).set(pageData)
+        .then(() => {
+          window.location.href = `${type}.html?id=${id}`;
+        })
+        .catch(error => {
+          alert("Error creating page: " + error);
+        });
+    }
+  </script>
 </body>
 </html>
