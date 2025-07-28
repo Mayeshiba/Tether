@@ -32,7 +32,7 @@
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com", // ✅ REQUIRED LINE
+      databaseURL: "https://tether-71e0c-default-rtdb.firebasedatabase.app",
       projectId: "tether-71e0c",
       storageBucket: "tether-71e0c.firebasestorage.app",
       messagingSenderId: "277809008742",
@@ -66,7 +66,6 @@
       });
     }
 
-    // Attach button event listeners after DOM loads
     document.getElementById('carBtn').addEventListener('click', () => createPage('car'));
     document.getElementById('furnaceBtn').addEventListener('click', () => createPage('furnace'));
   </script>
