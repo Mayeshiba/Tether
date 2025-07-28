@@ -6,10 +6,10 @@
   <style>
     body {
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 100px;
+      padding: 40px;
+      max-width: 600px;
+      margin: auto;
+      text-align: center;
     }
     button {
       padding: 15px 30px;
@@ -18,56 +18,49 @@
       cursor: pointer;
     }
   </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <h1>Select Template Type</h1>
-  <button id="carBtn">Car Maintenance</button>
-  <button id="furnaceBtn">Furnace Log</button>
+  <h1>Assign Page Type</h1>
+  <p>This QR code is not yet assigned. What kind of page should it be?</p>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
+  <button onclick="createPage('car')">Car Maintenance</button>
+  <button onclick="createPage('furnace')">Furnace Log</button>
 
+  <script>
+    // ✅ Full Firebase config with databaseURL
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebasedatabase.app",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
       projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.firebasestorage.app",
+      storageBucket: "tether-71e0c.appspot.com",
       messagingSenderId: "277809008742",
       appId: "1:277809008742:web:2586a2b821d8da8f969da7",
       measurementId: "G-X7ZQ6DJYEN"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
-    const db = getDatabase(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    function createUUID() {
-      return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
 
     function createPage(type) {
-      const id = createUUID();
-      const pageData = {
-        type: type,
-        created_at: new Date().toISOString()
-      };
-      const pageRef = ref(db, 'pages/' + id);
-      set(pageRef, pageData).then(() => {
-        const target = (type === 'car') ? 'car-maintenance.html' : 'furnace_log.html';
-        window.location.href = `${target}?id=${id}`;
+      const pageRef = db.ref('pages/' + id);
+      pageRef.set({ type: type }).then(() => {
+        if (type === 'car') {
+          window.location.href = `car_maintenance.html?id=${id}`;
+        } else if (type === 'furnace') {
+          window.location.href = `furnace_log.html?id=${id}`;
+        }
       }).catch(error => {
         alert("Error creating page: " + error);
       });
     }
-
-    document.getElementById('carBtn').addEventListener('click', () => createPage('car'));
-    document.getElementById('furnaceBtn').addEventListener('click', () => createPage('furnace'));
   </script>
 </body>
 </html>
