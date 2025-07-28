@@ -21,8 +21,8 @@
 </head>
 <body>
   <h1>Select Template Type</h1>
-  <button onclick="createPage('car')">Car Maintenance</button>
-  <button onclick="createPage('furnace')">Furnace Log</button>
+  <button id="carBtn">Car Maintenance</button>
+  <button id="furnaceBtn">Furnace Log</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -50,8 +50,7 @@
       });
     }
 
-    // 🔧 This is the working fix:
-    window.createPage = function(type) {
+    function createPage(type) {
       const id = createUUID();
       const pageData = {
         type: type,
@@ -64,7 +63,11 @@
       }).catch(error => {
         alert("Error creating page: " + error);
       });
-    };
+    }
+
+    // ✅ Attach buttons only after DOM is loaded
+    document.getElementById('carBtn').addEventListener('click', () => createPage('car'));
+    document.getElementById('furnaceBtn').addEventListener('click', () => createPage('furnace'));
   </script>
 </body>
 </html>
