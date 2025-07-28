@@ -1,66 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Car Maintenance Log</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      background-color: #f9f9f9;
-    }
-    h1 {
-      text-align: center;
-    }
-    #log {
-      margin-top: 20px;
-    }
-    .entry {
-      background-color: #fff;
-      padding: 12px;
-      margin-bottom: 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    textarea {
-      width: 100%;
-      height: 80px;
-      padding: 10px;
-      font-size: 14px;
-    }
-    button {
-      padding: 10px 15px;
-      font-size: 14px;
-      margin-top: 10px;
-    }
-  </style>
-</head>
-<body>
-  <h1>Car Maintenance Log</h1>
-  <p>Add a new log entry:</p>
-  <textarea id="entryText" placeholder="e.g. Oil changed, brakes inspected..."></textarea>
-  <br/>
-  <button onclick="saveEntry()">Save Entry</button>
-
-  <div id="log">
-    <h2>Previous Entries</h2>
-    <div id="entries"></div>
-  </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      apiKey: "AIzaSyCS6Dp3QwhuKOpBU7qU3LUjKf44GvZujX4",
       authDomain: "tether-71e0c.firebaseapp.com",
       databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
       projectId: "tether-71e0c",
       storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "277809008742",
-      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
-      measurementId: "G-X7ZQ6DJYEN"
+      messagingSenderId: "234552365687",
+      appId: "1:234552365687:web:9c13f27a92a54d36530d4f"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -69,38 +23,79 @@
     const urlParams = new URLSearchParams(window.location.search);
     const pageId = urlParams.get('id');
 
-    const entriesRef = ref(database, 'pages/' + pageId + '/entries');
+    const pageRef = ref(database, 'pages/' + pageId);
 
-    document.getElementById("entryText").addEventListener("keydown", function(e) {
-      if (e.ctrlKey && e.key === "Enter") {
-        saveEntry();
-      }
-    });
-
-    window.saveEntry = function () {
-      const text = document.getElementById("entryText").value.trim();
-      if (text === "") return;
-      push(entriesRef, {
-        text: text,
-        timestamp: new Date().toISOString()
-      });
-      document.getElementById("entryText").value = "";
-    };
-
-    onValue(entriesRef, (snapshot) => {
-      const entriesDiv = document.getElementById("entries");
-      entriesDiv.innerHTML = "";
+    get(pageRef).then((snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const sorted = Object.values(data).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        for (const entry of sorted) {
-          const div = document.createElement("div");
-          div.className = "entry";
-          div.innerHTML = `<strong>${new Date(entry.timestamp).toLocaleString()}</strong><br>${entry.text}`;
-          entriesDiv.appendChild(div);
-        }
+        document.getElementById('carType').value = data.carType || '';
+        document.getElementById('plateNumber').value = data.plateNumber || '';
+        document.getElementById('vinNumber').value = data.vinNumber || '';
       }
     });
+
+    window.saveCarDetails = function () {
+      const updates = {
+        carType: document.getElementById('carType').value,
+        plateNumber: document.getElementById('plateNumber').value,
+        vinNumber: document.getElementById('vinNumber').value,
+        type: "car"
+      };
+      update(pageRef, updates).then(() => {
+        alert("Car details saved.");
+      }).catch((error) => {
+        alert("Error saving: " + error);
+      });
+    };
+
+    window.resetPage = function () {
+      if (!pageId) return;
+      if (confirm("Are you sure you want to reset this QR code?")) {
+        remove(pageRef).then(() => {
+          alert("QR code reset.");
+          window.location.href = `index.html?id=${pageId}`;
+        });
+      }
+    };
   </script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 40px;
+      max-width: 600px;
+      margin: auto;
+    }
+    label {
+      display: block;
+      margin-top: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      margin-top: 30px;
+    }
+    #resetBtn {
+      background-color: #f44336;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Car Maintenance Log</h1>
+
+  <label>Car Type:</label>
+  <input id="carType" placeholder="e.g. Toyota Camry" />
+
+  <label>License Plate Number:</label>
+  <input id="plateNumber" placeholder="e.g. ABC1234" />
+
+  <label>VIN Number:</label>
+  <input id="vinNumber" placeholder="e.g. 1HGCM82633A123456" />
+
+  <button onclick="saveCarDetails()">Save</button>
+  <button id="resetBtn" onclick="resetPage()">Reset QR Code</button>
 </body>
 </html>
