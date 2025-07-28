@@ -1,72 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>Assign Page Type</title>
+  <script type="module">
+    // Firebase setup
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCS6Dp3QwhuKOpBU7qU3LUjKf44GvZujX4",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "234552365687",
+      appId: "1:234552365687:web:9c13f27a92a54d36530d4f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageId = urlParams.get('id');
+
+    if (!pageId) {
+      alert("Missing page ID in URL (e.g., ?id=abc123)");
+    } else {
+      const pageRef = ref(database, 'pages/' + pageId);
+      get(pageRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          const pageType = snapshot.val().type;
+          if (pageType === "car") {
+            window.location.href = `car_maintenance.html?id=${pageId}`;
+          } else if (pageType === "furnace") {
+            window.location.href = `furnace_log.html?id=${pageId}`;
+          }
+        }
+      });
+    }
+
+    function assignPage(type) {
+      if (!pageId) return;
+      const pageRef = ref(database, 'pages/' + pageId);
+      set(pageRef, { type: type }).then(() => {
+        if (type === "car") {
+          window.location.href = `car_maintenance.html?id=${pageId}`;
+        } else if (type === "furnace") {
+          window.location.href = `furnace_log.html?id=${pageId}`;
+        }
+      });
+    }
+
+    window.assignPage = assignPage;
+  </script>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: Arial, sans-serif;
       text-align: center;
       padding-top: 100px;
-      background-color: #f8f8f8;
     }
     button {
-      font-size: 16px;
-      padding: 12px 20px;
       margin: 10px;
-      cursor: pointer;
+      padding: 10px 20px;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
   <h1>Assign Page Type</h1>
   <p>This QR code is not yet assigned. What kind of page should it be?</p>
-  <button onclick="createPage('car_maintenance')">Car Maintenance</button>
-  <button onclick="createPage('furnace_log')">Furnace Log</button>
-
-  <script type="module">
-    // Import Firebase
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-    // Your Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "277809008742",
-      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
-      measurementId: "G-X7ZQ6DJYEN"
-    };
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const database = getDatabase(app);
-
-    // Get the page ID from the URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const pageId = urlParams.get('id');
-
-    // Create page function
-    window.createPage = function (type) {
-      if (!pageId) {
-        alert("Missing page ID in URL (e.g., ?id=abc123)");
-        return;
-      }
-
-      // Set type in the database
-      set(ref(database, 'pages/' + pageId), {
-        type: type
-      }).then(() => {
-        window.location.href = `${type}.html?id=${pageId}`;
-      }).catch((error) => {
-        console.error("Database error:", error);
-        alert("Error saving to database.");
-      });
-    };
-  </script>
+  <button onclick="assignPage('car')">Car Maintenance</button>
+  <button onclick="assignPage('furnace')">Furnace Log</button>
 </body>
 </html>
