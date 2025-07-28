@@ -44,4 +44,27 @@
     const db = getDatabase(app);
 
     function createUUID() {
-      r
+      return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    // 🔧 This is the working fix:
+    window.createPage = function(type) {
+      const id = createUUID();
+      const pageData = {
+        type: type,
+        created_at: new Date().toISOString()
+      };
+      const pageRef = ref(db, 'pages/' + id);
+      set(pageRef, pageData).then(() => {
+        const target = (type === 'car') ? 'car-maintenance.html' : 'furnace_log.html';
+        window.location.href = `${target}?id=${id}`;
+      }).catch(error => {
+        alert("Error creating page: " + error);
+      });
+    };
+  </script>
+</body>
+</html>
