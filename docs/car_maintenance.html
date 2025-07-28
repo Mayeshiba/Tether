@@ -1,56 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Car Maintenance Log</title>
   <style>
     body {
       font-family: sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
       padding: 20px;
+      background-color: #f9f9f9;
     }
-    label {
-      display: block;
-      margin-top: 15px;
-      font-weight: bold;
+    h1 {
+      text-align: center;
     }
-    input, textarea, button {
+    #log {
+      margin-top: 20px;
+    }
+    .entry {
+      background-color: #fff;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    textarea {
       width: 100%;
+      height: 80px;
       padding: 10px;
-      margin-top: 5px;
-      font-size: 16px;
+      font-size: 14px;
     }
     button {
-      margin-top: 20px;
-      cursor: pointer;
+      padding: 10px 15px;
+      font-size: 14px;
+      margin-top: 10px;
     }
   </style>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
-
-  <label for="carType">Car Type</label>
-  <input id="carType" type="text" placeholder="e.g. Toyota Camry">
-
-  <label for="licensePlate">License Plate Number</label>
-  <input id="licensePlate" type="text" placeholder="e.g. ABC-1234">
-
-  <label for="vin">VIN Number</label>
-  <input id="vin" type="text" placeholder="e.g. 1HGCM82633A123456">
-
-  <label for="notes">Maintenance Notes</label>
-  <textarea id="notes" rows="5" placeholder="e.g. Oil change on July 15, replaced air filter..."></textarea>
-
+  <p>Add a new log entry:</p>
+  <textarea id="entryText" placeholder="e.g. Oil changed, brakes inspected..."></textarea>
+  <br/>
   <button onclick="saveEntry()">Save Entry</button>
 
-  <p id="status"></p>
+  <div id="log">
+    <h2>Previous Entries</h2>
+    <div id="entries"></div>
+  </div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
@@ -62,28 +63,44 @@
       measurementId: "G-X7ZQ6DJYEN"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
 
-    const id = new URLSearchParams(window.location.search).get("id");
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageId = urlParams.get('id');
 
-    function saveEntry() {
-      const entry = {
-        carType: document.getElementById("carType").value,
-        licensePlate: document.getElementById("licensePlate").value,
-        vin: document.getElementById("vin").value,
-        notes: document.getElementById("notes").value,
+    const entriesRef = ref(database, 'pages/' + pageId + '/entries');
+
+    document.getElementById("entryText").addEventListener("keydown", function(e) {
+      if (e.ctrlKey && e.key === "Enter") {
+        saveEntry();
+      }
+    });
+
+    window.saveEntry = function () {
+      const text = document.getElementById("entryText").value.trim();
+      if (text === "") return;
+      push(entriesRef, {
+        text: text,
         timestamp: new Date().toISOString()
-      };
+      });
+      document.getElementById("entryText").value = "";
+    };
 
-      db.ref("pages/" + id + "/entries").push(entry)
-        .then(() => {
-          document.getElementById("status").innerText = "Entry saved successfully!";
-        })
-        .catch((error) => {
-          document.getElementById("status").innerText = "Error: " + error;
-        });
-    }
+    onValue(entriesRef, (snapshot) => {
+      const entriesDiv = document.getElementById("entries");
+      entriesDiv.innerHTML = "";
+      const data = snapshot.val();
+      if (data) {
+        const sorted = Object.values(data).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        for (const entry of sorted) {
+          const div = document.createElement("div");
+          div.className = "entry";
+          div.innerHTML = `<strong>${new Date(entry.timestamp).toLocaleString()}</strong><br>${entry.text}`;
+          entriesDiv.appendChild(div);
+        }
+      }
+    });
   </script>
 </body>
 </html>
