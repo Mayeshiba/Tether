@@ -23,8 +23,8 @@
   <h1 id="status">Loading...</h1>
   <div id="chooser" style="display:none;">
     <p>This QR code is not yet assigned. What kind of page should this be?</p>
-    <button onclick="assignType('car')">Car Maintenance</button>
-    <button onclick="assignType('furnace')">Furnace Log</button>
+    <button id="carBtn">Car Maintenance</button>
+    <button id="furnaceBtn">Furnace Log</button>
   </div>
 
   <script type="module">
@@ -35,6 +35,7 @@
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebasedatabase.app",
       projectId: "tether-71e0c",
       storageBucket: "tether-71e0c.firebasestorage.app",
       messagingSenderId: "277809008742",
@@ -48,41 +49,44 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('id');
-    const pageRef = ref(db, 'pages/' + id);
     const statusEl = document.getElementById('status');
     const chooserEl = document.getElementById('chooser');
+    const pageRef = ref(db, 'pages/' + id);
 
     if (!id) {
-      statusEl.innerText = "Error: No ID provided in URL.";
+      statusEl.innerText = "❌ Error: No ID in URL.";
     } else {
       get(pageRef).then(snapshot => {
         const data = snapshot.val();
         if (data && data.type) {
-          redirectToType(data.type);
+          redirectToTemplate(data.type);
         } else {
-          statusEl.innerText = "This page hasn't been assigned yet.";
+          statusEl.innerText = "This QR code hasn't been set up yet.";
           chooserEl.style.display = "block";
         }
       }).catch(error => {
-        statusEl.innerText = "Error reading data: " + error;
+        statusEl.innerText = "❌ Error reading from database: " + error;
       });
     }
 
-    window.assignType = function(type) {
+    function redirectToTemplate(type) {
+      const target = (type === 'car') ? 'car-maintenance.html' : 'furnace_log.html';
+      window.location.href = `${target}?id=${id}`;
+    }
+
+    document.getElementById('carBtn').addEventListener('click', () => assignType('car'));
+    document.getElementById('furnaceBtn').addEventListener('click', () => assignType('furnace'));
+
+    function assignType(type) {
       const newData = {
         type: type,
         created_at: new Date().toISOString()
       };
       set(pageRef, newData).then(() => {
-        redirectToType(type);
+        redirectToTemplate(type);
       }).catch(error => {
-        statusEl.innerText = "Error saving: " + error;
+        statusEl.innerText = "❌ Error saving to database: " + error;
       });
-    };
-
-    function redirectToType(type) {
-      const target = (type === 'car') ? 'car-maintenance.html' : 'furnace_log.html';
-      window.location.href = `${target}?id=${id}`;
     }
   </script>
 </body>
