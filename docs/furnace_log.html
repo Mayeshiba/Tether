@@ -7,52 +7,44 @@
   <style>
     body {
       font-family: sans-serif;
+      padding: 40px;
       max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      background: #f4f4f4;
+      margin: auto;
+      background: #f9f9f9;
     }
     h1 {
       text-align: center;
     }
-    textarea, input[type="text"] {
+    label {
+      display: block;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    input, button {
       width: 100%;
       padding: 10px;
-      margin: 8px 0;
-      box-sizing: border-box;
       font-size: 16px;
     }
     button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
-    .log-entry {
-      background: white;
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-top: 10px;
-    }
-    .timestamp {
-      font-size: 0.8em;
-      color: gray;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Furnace Service Log</h1>
-  <p><strong>ID:</strong> <span id="qrId">Loading...</span></p>
+  <h1>Furnace Log</h1>
 
-  <textarea id="logText" placeholder="Describe the service performed, inspection notes, etc..."></textarea>
-  <button onclick="addEntry()">Add Entry</button>
+  <label for="furnaceType">Furnace Type</label>
+  <input id="furnaceType" placeholder="e.g. Trane Gas Furnace" />
 
-  <h2>History</h2>
-  <div id="logList">Loading log...</div>
+  <label for="address">Address</label>
+  <input id="address" placeholder="e.g. 1234 Maple St, Anytown, USA" />
+
+  <button onclick="saveFurnaceDetails()">Save</button>
+  <button onclick="resetPage()">Reset Page</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, push, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -68,51 +60,40 @@
     const db = getDatabase(app);
 
     const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
-    const qrIdEl = document.getElementById("qrId");
-    const logList = document.getElementById("logList");
+    const id = params.get('id');
 
     if (!id) {
-      qrIdEl.textContent = "Missing QR code ID.";
-      logList.textContent = "";
+      alert("Missing QR code ID in URL.");
     } else {
-      qrIdEl.textContent = id;
-      loadLogs();
-    }
-
-    function addEntry() {
-      const text = document.getElementById("logText").value.trim();
-      if (!text) return alert("Please enter service details.");
-
-      const entryRef = ref(db, `qrCodes/${id}/log`);
-      push(entryRef, {
-        text: text,
-        timestamp: Date.now()
-      }).then(() => {
-        document.getElementById("logText").value = "";
-        loadLogs();
-      });
-    }
-
-    function loadLogs() {
-      const entryRef = ref(db, `qrCodes/${id}/log`);
-      get(entryRef).then(snapshot => {
-        logList.innerHTML = "";
-        if (snapshot.exists()) {
-          const entries = snapshot.val();
-          const sorted = Object.values(entries).sort((a, b) => b.timestamp - a.timestamp);
-          for (const entry of sorted) {
-            const div = document.createElement("div");
-            div.className = "log-entry";
-            const date = new Date(entry.timestamp).toLocaleString();
-            div.innerHTML = `<div class="timestamp">${date}</div><div>${entry.text}</div>`;
-            logList.appendChild(div);
-          }
-        } else {
-          logList.textContent = "No furnace service entries yet.";
+      const pageRef = ref(db, 'qrCodes/' + id);
+      get(pageRef).then(snapshot => {
+        const data = snapshot.val();
+        if (data) {
+          document.getElementById('furnaceType').value = data.furnaceType || '';
+          document.getElementById('address').value = data.address || '';
         }
       });
     }
+
+    window.saveFurnaceDetails = function () {
+      const updates = {
+        furnaceType: document.getElementById('furnaceType').value,
+        address: document.getElementById('address').value
+      };
+      update(ref(db, 'qrCodes/' + id), updates).then(() => {
+        alert("Furnace details saved.");
+      }).catch(error => {
+        alert("Error saving: " + error);
+      });
+    };
+
+    window.resetPage = function () {
+      if (!id) return;
+      remove(ref(db, 'qrCodes/' + id)).then(() => {
+        alert("Page reset. Redirecting...");
+        window.location.href = `index.html?id=${id}`;
+      });
+    };
   </script>
 </body>
 </html>
