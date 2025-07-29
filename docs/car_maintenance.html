@@ -7,52 +7,47 @@
   <style>
     body {
       font-family: sans-serif;
+      padding: 40px;
       max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      background: #f4f4f4;
+      margin: auto;
+      background: #f9f9f9;
     }
     h1 {
       text-align: center;
     }
-    textarea, input[type="text"] {
+    label {
+      display: block;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    input, button {
       width: 100%;
       padding: 10px;
-      margin: 8px 0;
-      box-sizing: border-box;
       font-size: 16px;
     }
     button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
-    .log-entry {
-      background: white;
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-top: 10px;
-    }
-    .timestamp {
-      font-size: 0.8em;
-      color: gray;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
-  <p><strong>ID:</strong> <span id="qrId">Loading...</span></p>
 
-  <textarea id="logText" placeholder="Describe the maintenance performed..."></textarea>
-  <button onclick="addEntry()">Add Entry</button>
+  <label for="carType">Car Type</label>
+  <input id="carType" placeholder="e.g. Toyota Camry" />
 
-  <h2>History</h2>
-  <div id="logList">Loading log...</div>
+  <label for="plateNumber">License Plate Number</label>
+  <input id="plateNumber" placeholder="e.g. ABC1234" />
+
+  <label for="vinNumber">VIN Number</label>
+  <input id="vinNumber" placeholder="e.g. 1HGCM82633A123456" />
+
+  <button onclick="saveCarDetails()">Save</button>
+  <button onclick="resetPage()">Reset Page</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, push, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -68,51 +63,42 @@
     const db = getDatabase(app);
 
     const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
-    const qrIdEl = document.getElementById("qrId");
-    const logList = document.getElementById("logList");
+    const id = params.get('id');
 
     if (!id) {
-      qrIdEl.textContent = "Missing QR code ID.";
-      logList.textContent = "";
+      alert("Missing QR code ID in URL.");
     } else {
-      qrIdEl.textContent = id;
-      loadLogs();
-    }
-
-    function addEntry() {
-      const text = document.getElementById("logText").value.trim();
-      if (!text) return alert("Please enter maintenance details.");
-
-      const entryRef = ref(db, `qrCodes/${id}/log`);
-      push(entryRef, {
-        text: text,
-        timestamp: Date.now()
-      }).then(() => {
-        document.getElementById("logText").value = "";
-        loadLogs();
-      });
-    }
-
-    function loadLogs() {
-      const entryRef = ref(db, `qrCodes/${id}/log`);
-      get(entryRef).then(snapshot => {
-        logList.innerHTML = "";
-        if (snapshot.exists()) {
-          const entries = snapshot.val();
-          const sorted = Object.values(entries).sort((a, b) => b.timestamp - a.timestamp);
-          for (const entry of sorted) {
-            const div = document.createElement("div");
-            div.className = "log-entry";
-            const date = new Date(entry.timestamp).toLocaleString();
-            div.innerHTML = `<div class="timestamp">${date}</div><div>${entry.text}</div>`;
-            logList.appendChild(div);
-          }
-        } else {
-          logList.textContent = "No maintenance entries yet.";
+      const pageRef = ref(db, 'qrCodes/' + id);
+      get(pageRef).then(snapshot => {
+        const data = snapshot.val();
+        if (data) {
+          document.getElementById('carType').value = data.carType || '';
+          document.getElementById('plateNumber').value = data.plateNumber || '';
+          document.getElementById('vinNumber').value = data.vinNumber || '';
         }
       });
     }
+
+    window.saveCarDetails = function () {
+      const updates = {
+        carType: document.getElementById('carType').value,
+        plateNumber: document.getElementById('plateNumber').value,
+        vinNumber: document.getElementById('vinNumber').value
+      };
+      update(ref(db, 'qrCodes/' + id), updates).then(() => {
+        alert("Car details saved.");
+      }).catch(error => {
+        alert("Error saving: " + error);
+      });
+    };
+
+    window.resetPage = function () {
+      if (!id) return;
+      remove(ref(db, 'qrCodes/' + id)).then(() => {
+        alert("Page reset. Redirecting...");
+        window.location.href = `index.html?id=${id}`;
+      });
+    };
   </script>
 </body>
 </html>
