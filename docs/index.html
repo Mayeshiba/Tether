@@ -35,12 +35,11 @@
     <button onclick="resetQRCode()">Reset QR Code</button>
   </div>
 
-  <!-- Firebase SDKs -->
+  <!-- Firebase SDKs (non-module version) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
 
   <script>
-    // Initialize Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
       authDomain: "qr-sticker-demo.firebaseapp.com",
@@ -54,11 +53,9 @@
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // Get ID from URL
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('id');
 
-    // Assign template to QR code
     function assignTemplate(templateName) {
       if (!id) {
         alert("Missing QR ID in URL.");
@@ -73,7 +70,6 @@
       });
     }
 
-    // Reset QR code
     function resetQRCode() {
       if (!id) {
         alert("Missing QR ID in URL.");
@@ -85,7 +81,6 @@
       });
     }
 
-    // Expose to inline buttons
     window.assignTemplate = assignTemplate;
     window.resetQRCode = resetQRCode;
   </script>
