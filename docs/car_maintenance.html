@@ -1,53 +1,21 @@
+<!-- car_maintenance.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Car Maintenance Log</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 40px;
-      max-width: 600px;
-      margin: auto;
-      background: #f9f9f9;
-    }
-    h1 {
-      text-align: center;
-    }
-    label {
-      display: block;
-      margin-top: 20px;
-      font-weight: bold;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-    }
-    button {
-      margin-top: 20px;
-    }
-  </style>
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
-
-  <label for="carType">Car Type</label>
-  <input id="carType" placeholder="e.g. Toyota Camry" />
-
-  <label for="plateNumber">License Plate Number</label>
-  <input id="plateNumber" placeholder="e.g. ABC1234" />
-
-  <label for="vinNumber">VIN Number</label>
-  <input id="vinNumber" placeholder="e.g. 1HGCM82633A123456" />
-
-  <button onclick="saveCarDetails()">Save</button>
-  <button onclick="resetPage()">Reset Page</button>
+  <textarea id="log" rows="10" cols="50" placeholder="Enter maintenance notes..."></textarea><br>
+  <button onclick="saveLog()">Save</button>
+  <button onclick="resetQRCode()">Reset</button>
+  <p id="status"></p>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, get, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -61,44 +29,30 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+    const logRef = ref(db, 'logs/car_maintenance/' + id);
 
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
+    const logArea = document.getElementById("log");
+    const statusText = document.getElementById("status");
 
-    if (!id) {
-      alert("Missing QR code ID in URL.");
-    } else {
-      const pageRef = ref(db, 'qrCodes/' + id);
-      get(pageRef).then(snapshot => {
-        const data = snapshot.val();
-        if (data) {
-          document.getElementById('carType').value = data.carType || '';
-          document.getElementById('plateNumber').value = data.plateNumber || '';
-          document.getElementById('vinNumber').value = data.vinNumber || '';
-        }
+    get(logRef).then(snapshot => {
+      if (snapshot.exists()) {
+        logArea.value = snapshot.val();
+      }
+    });
+
+    window.saveLog = function() {
+      set(logRef, logArea.value).then(() => {
+        statusText.textContent = "Saved.";
       });
     }
 
-    window.saveCarDetails = function () {
-      const updates = {
-        carType: document.getElementById('carType').value,
-        plateNumber: document.getElementById('plateNumber').value,
-        vinNumber: document.getElementById('vinNumber').value
-      };
-      update(ref(db, 'qrCodes/' + id), updates).then(() => {
-        alert("Car details saved.");
-      }).catch(error => {
-        alert("Error saving: " + error);
-      });
-    };
-
-    window.resetPage = function () {
-      if (!id) return;
+    window.resetQRCode = function() {
       remove(ref(db, 'qrCodes/' + id)).then(() => {
-        alert("Page reset. Redirecting...");
-        window.location.href = `index.html?id=${id}`;
+        statusText.textContent = "QR code assignment reset. Return to index.";
       });
-    };
+    }
   </script>
 </body>
 </html>
