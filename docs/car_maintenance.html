@@ -1,101 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Car Maintenance Log</title>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCS6Dp3QwhuKOpBU7qU3LUjKf44GvZujX4",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "234552365687",
-      appId: "1:234552365687:web:9c13f27a92a54d36530d4f"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const database = getDatabase(app);
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const pageId = urlParams.get('id');
-
-    const pageRef = ref(database, 'pages/' + pageId);
-
-    get(pageRef).then((snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        document.getElementById('carType').value = data.carType || '';
-        document.getElementById('plateNumber').value = data.plateNumber || '';
-        document.getElementById('vinNumber').value = data.vinNumber || '';
-      }
-    });
-
-    window.saveCarDetails = function () {
-      const updates = {
-        carType: document.getElementById('carType').value,
-        plateNumber: document.getElementById('plateNumber').value,
-        vinNumber: document.getElementById('vinNumber').value,
-        type: "car"
-      };
-      update(pageRef, updates).then(() => {
-        alert("Car details saved.");
-      }).catch((error) => {
-        alert("Error saving: " + error);
-      });
-    };
-
-    window.resetPage = function () {
-      if (!pageId) return;
-      if (confirm("Are you sure you want to reset this QR code?")) {
-        remove(pageRef).then(() => {
-          alert("QR code reset.");
-          window.location.href = `index.html?id=${pageId}`;
-        });
-      }
-    };
-  </script>
   <style>
     body {
       font-family: sans-serif;
-      padding: 40px;
-      max-width: 600px;
-      margin: auto;
+      padding: 20px;
+      background: #f4f4f4;
     }
-    label {
-      display: block;
-      margin-top: 20px;
-    }
-    input, button {
+    textarea {
       width: 100%;
-      padding: 10px;
+      height: 200px;
       font-size: 16px;
     }
     button {
-      margin-top: 30px;
+      margin-top: 10px;
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
     }
-    #resetBtn {
-      background-color: #f44336;
-      color: white;
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
   </style>
 </head>
 <body>
-  <h1>Car Maintenance Log</h1>
+  <div class="header">
+    <h1>Car Maintenance Log</h1>
+    <button onclick="resetQRCode()">Reset QR</button>
+  </div>
 
-  <label>Car Type:</label>
-  <input id="carType" placeholder="e.g. Toyota Camry" />
+  <textarea id="log" placeholder="Enter maintenance notes..."></textarea><br>
+  <button onclick="saveLog()">Save</button>
 
-  <label>License Plate Number:</label>
-  <input id="plateNumber" placeholder="e.g. ABC1234" />
+  <script type="module">
+    // Firebase imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, get, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-  <label>VIN Number:</label>
-  <input id="vinNumber" placeholder="e.g. 1HGCM82633A123456" />
+    const firebaseConfig = {
+      apiKey: "AIzaSyDY3ENMrg8mF4KJxWmFYa8f-cvP7j4eZIA",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "594607308243",
+      appId: "1:594607308243:web:e6ac85c7e78077fcf6c06b"
+    };
 
-  <button onclick="saveCarDetails()">Save</button>
-  <button id="resetBtn" onclick="resetPage()">Reset QR Code</button>
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const params = new URLSearchParams(window.location.search);
+    const pageId = params.get("id");
+    const logRef = ref(db, "pages/" + pageId + "/log");
+
+    const textarea = document.getElementById("log");
+
+    // Load existing log
+    get(logRef).then(snapshot => {
+      if (snapshot.exists()) {
+        textarea.value = snapshot.val();
+      }
+    });
+
+    // Save to DB
+    function saveLog() {
+      set(logRef, textarea.value).then(() => {
+        alert("Saved!");
+      });
+    }
+
+    // Reset this QR code
+    function resetQRCode() {
+      if (!pageId) return;
+      if (confirm("Are you sure you want to reset this QR code? All saved data will be lost.")) {
+        remove(ref(db, 'pages/' + pageId))
+          .then(() => {
+            alert("QR code reset. Returning to index.");
+            window.location.href = "index.html?id=" + pageId;
+          })
+          .catch(err => alert("Error resetting: " + err));
+      }
+    }
+  </script>
 </body>
 </html>
