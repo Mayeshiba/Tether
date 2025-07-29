@@ -8,44 +8,47 @@
   <style>
     body {
       font-family: sans-serif;
-      padding: 40px;
-      max-width: 600px;
-      margin: auto;
+      padding: 20px;
       background: #f9f9f9;
     }
     h1 {
       text-align: center;
     }
-    label {
-      display: block;
-      margin-top: 20px;
-      font-weight: bold;
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    li {
+      background: #fff;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     input, button {
-      width: 100%;
       padding: 10px;
+      margin-top: 10px;
       font-size: 16px;
     }
-    button {
+    #reset {
       margin-top: 20px;
+      background: #e74c3c;
+      color: white;
     }
   </style>
 </head>
 <body>
   <h1>Furnace Log</h1>
+  <ul id="log"></ul>
 
-  <label for="furnaceType">Furnace Type</label>
-  <input id="furnaceType" placeholder="e.g. Trane Gas Furnace" />
+  <input id="entry" placeholder="Enter a furnace note" />
+  <button onclick="addEntry()">Add Entry</button>
 
-  <label for="address">Address</label>
-  <input id="address" placeholder="e.g. 1234 Maple St, Anytown, USA" />
-
-  <button onclick="saveFurnaceDetails()">Save</button>
-  <button onclick="resetPage()">Reset Page</button>
+  <button id="reset" onclick="resetPage()">Reset QR Code</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -63,37 +66,38 @@
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
 
-    if (!id) {
-      alert("Missing QR code ID in URL.");
-    } else {
-      const pageRef = ref(db, 'qrCodes/' + id);
-      get(pageRef).then(snapshot => {
-        const data = snapshot.val();
-        if (data) {
-          document.getElementById('furnaceType').value = data.furnaceType || '';
-          document.getElementById('address').value = data.address || '';
-        }
-      });
-    }
+    const entriesRef = ref(db, 'pages/' + id + '/entries');
+    const logList = document.getElementById('log');
 
-    window.saveFurnaceDetails = function () {
-      const updates = {
-        furnaceType: document.getElementById('furnaceType').value,
-        address: document.getElementById('address').value
-      };
-      update(ref(db, 'qrCodes/' + id), updates).then(() => {
-        alert("Furnace details saved.");
-      }).catch(error => {
-        alert("Error saving: " + error);
+    onValue(entriesRef, snapshot => {
+      logList.innerHTML = '';
+      const data = snapshot.val();
+      if (data) {
+        const sorted = Object.entries(data).sort((a, b) => new Date(a[1].timestamp) - new Date(b[1].timestamp));
+        sorted.forEach(([key, value]) => {
+          const li = document.createElement('li');
+          li.textContent = `${new Date(value.timestamp).toLocaleString()}: ${value.text}`;
+          logList.appendChild(li);
+        });
+      }
+    });
+
+    window.addEntry = function() {
+      const entry = document.getElementById('entry').value.trim();
+      if (!entry) return;
+      push(entriesRef, {
+        text: entry,
+        timestamp: new Date().toISOString()
       });
+      document.getElementById('entry').value = '';
     };
 
-    window.resetPage = function () {
-      if (!id) return;
-      remove(ref(db, 'qrCodes/' + id)).then(() => {
-        alert("Page reset. Redirecting...");
-        window.location.href = `index.html?id=${id}`;
-      });
+    window.resetPage = function() {
+      if (confirm("This will erase this QR code's data and send you back to assign a new type. Continue?")) {
+        remove(ref(db, 'pages/' + id)).then(() => {
+          window.location.href = "index.html?id=" + id;
+        });
+      }
     };
   </script>
 </body>
