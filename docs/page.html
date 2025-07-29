@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>QR Redirect</title>
+  <title>Loading Page...</title>
   <style>
     body {
       font-family: sans-serif;
@@ -12,17 +12,15 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
-      margin: 0;
-      background: #f4f4f4;
+      background-color: #f2f2f2;
     }
     h1 {
       font-size: 24px;
-      color: #333;
     }
   </style>
 </head>
 <body>
-  <h1>Checking QR Code...</h1>
+  <h1>Loading your page...</h1>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -41,23 +39,23 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get("id");
 
     if (!id) {
-      window.location.href = "index.html";
+      document.body.innerHTML = "<h1>Error: No ID provided in URL.</h1>";
     } else {
-      const qrRef = ref(db, `qrCodes/${id}`);
-      get(qrRef).then(snapshot => {
-        if (snapshot.exists() && snapshot.val().template) {
-          const template = snapshot.val().template;
-          window.location.href = `${template}.html?id=${id}`;
+      const pageRef = ref(db, 'qrCodes/' + id);
+      get(pageRef).then(snapshot => {
+        const data = snapshot.val();
+        if (data && data.template) {
+          window.location.href = `${data.template}.html?id=${id}`;
         } else {
-          window.location.href = "index.html?id=" + id;
+          // If no template assigned, go to index page to let user choose
+          window.location.href = `index.html?id=${id}`;
         }
-      }).catch(error => {
-        console.error("Error reading data:", error);
-        window.location.href = "index.html?id=" + id;
+      }).catch(err => {
+        document.body.innerHTML = "<h1>Error loading data.</h1><p>" + err + "</p>";
       });
     }
   </script>
