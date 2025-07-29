@@ -1,3 +1,4 @@
+<!-- page.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,7 +52,6 @@
         if (data && data.template) {
           window.location.href = `${data.template}.html?id=${id}`;
         } else {
-          // If no template assigned, go to index page to let user choose
           window.location.href = `index.html?id=${id}`;
         }
       }).catch(err => {
