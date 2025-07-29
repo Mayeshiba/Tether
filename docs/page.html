@@ -4,28 +4,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Loading Page...</title>
+  <title>QR Page Viewer</title>
   <style>
     body {
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background-color: #f2f2f2;
+      padding: 20px;
+      background: #f0f0f0;
     }
-    h1 {
-      font-size: 24px;
+    h1, h2 {
+      text-align: center;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background: #fff;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    #reset {
+      display: block;
+      margin: 30px auto 0;
+      background: #c0392b;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Loading your page...</h1>
+  <h1>QR Page Details</h1>
+  <h2 id="type">Loading type...</h2>
+  <ul id="entries"></ul>
+
+  <button id="reset" onclick="resetCode()">Reset QR Code</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -40,24 +61,47 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get("id");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const typeEl = document.getElementById('type');
+    const entriesEl = document.getElementById('entries');
 
     if (!id) {
-      document.body.innerHTML = "<h1>Error: No ID provided in URL.</h1>";
+      typeEl.textContent = "Missing QR ID in URL.";
     } else {
-      const pageRef = ref(db, 'qrCodes/' + id);
-      get(pageRef).then(snapshot => {
+      const pageRef = ref(db, 'pages/' + id);
+      const entriesRef = ref(db, 'pages/' + id + '/entries');
+
+      onValue(pageRef, snapshot => {
         const data = snapshot.val();
-        if (data && data.template) {
-          window.location.href = `${data.template}.html?id=${id}`;
+        if (!data) {
+          typeEl.textContent = "No data found for this QR code.";
         } else {
-          window.location.href = `index.html?id=${id}`;
+          typeEl.textContent = data.type ? `Type: ${data.type}` : "Unassigned QR code";
         }
-      }).catch(err => {
-        document.body.innerHTML = "<h1>Error loading data.</h1><p>" + err + "</p>";
+      });
+
+      onValue(entriesRef, snapshot => {
+        entriesEl.innerHTML = '';
+        const data = snapshot.val();
+        if (data) {
+          const sorted = Object.entries(data).sort((a, b) => new Date(a[1].timestamp) - new Date(b[1].timestamp));
+          sorted.forEach(([_, entry]) => {
+            const li = document.createElement('li');
+            li.textContent = `${new Date(entry.timestamp).toLocaleString()}: ${entry.text}`;
+            entriesEl.appendChild(li);
+          });
+        }
       });
     }
+
+    window.resetCode = function() {
+      if (confirm("This will erase this QR code and return to the index page.")) {
+        remove(ref(db, 'pages/' + id)).then(() => {
+          window.location.href = "index.html?id=" + id;
+        });
+      }
+    };
   </script>
 </body>
 </html>
