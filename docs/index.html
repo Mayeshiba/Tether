@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assign Page Type</title>
   <style>
     body {
@@ -30,57 +30,64 @@
   <h1>Assign Page Type</h1>
   <p>This QR code is not yet assigned. What kind of page should it be?</p>
   <div>
-    <button onclick="assignTemplate('car-maintenance')">Car Maintenance</button>
+    <button onclick="assignTemplate('car_maintenance')">Car Maintenance</button>
     <button onclick="assignTemplate('furnace_log')">Furnace Log</button>
     <button onclick="resetQRCode()">Reset QR Code</button>
   </div>
 
+  <!-- Firebase -->
   <script type="module">
-    // Import Firebase
+    // Your Firebase config
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, set, get, child, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyDY3ENMrg8mF4KJxWmFYa8f-cvP7j4eZIA",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "594607308243",
-      appId: "1:594607308243:web:e6ac85c7e78077fcf6c06b"
+      apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
+      authDomain: "qr-sticker-demo.firebaseapp.com",
+      databaseURL: "https://qr-sticker-demo-default-rtdb.firebaseio.com",
+      projectId: "qr-sticker-demo",
+      storageBucket: "qr-sticker-demo.appspot.com",
+      messagingSenderId: "787247635596",
+      appId: "1:787247635596:web:946fb94a38360fc7ac6c77"
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const dbRef = ref(db);
+    const database = getDatabase(app);
 
-    // Get page ID from URL
+    // Get ID from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const pageId = urlParams.get('id');
+    const id = urlParams.get('id');
 
-    if (!pageId) {
-      alert("Missing page ID in URL (e.g., ?id=abc123)");
-    }
-
-    // Assign selected template
+    // Assign template
     function assignTemplate(templateName) {
-      if (!pageId) return;
-      set(ref(db, 'pages/' + pageId), {
-        type: templateName
+      if (!id) {
+        alert("Missing QR ID in URL.");
+        return;
+      }
+
+      set(ref(database, 'qrCodes/' + id), {
+        template: templateName,
+        createdAt: Date.now()
       }).then(() => {
-        window.location.href = `${templateName}.html?id=${pageId}`;
+        window.location.href = `${templateName}.html?id=${id}`;
       });
     }
 
-    // Reset QR code assignment
+    // Reset QR code
     function resetQRCode() {
-      if (!pageId) return;
-      if (confirm("Are you sure you want to reset this QR code? This will erase its current assignment.")) {
-        remove(ref(db, 'pages/' + pageId))
-          .then(() => alert("QR code reset successfully."))
-          .catch(err => alert("Error resetting: " + err));
+      if (!id) {
+        alert("Missing QR ID in URL.");
+        return;
       }
+
+      remove(ref(database, 'qrCodes/' + id)).then(() => {
+        alert("QR Code has been reset.");
+      });
     }
+
+    // Attach to global for inline onclick
+    window.assignTemplate = assignTemplate;
+    window.resetQRCode = resetQRCode;
   </script>
 </body>
 </html>
