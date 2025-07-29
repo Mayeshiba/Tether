@@ -3,88 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Custom QR Page</title>
+  <title>QR Redirect</title>
   <style>
     body {
       font-family: sans-serif;
-      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
       background: #f4f4f4;
     }
-    textarea {
-      width: 100%;
-      height: 200px;
-      font-size: 16px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 10px 15px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    h1 {
+      font-size: 24px;
+      color: #333;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Generic QR Page</h1>
-    <button onclick="resetQRCode()">Reset QR</button>
-  </div>
-
-  <textarea id="content" placeholder="Write your notes here..."></textarea><br>
-  <button onclick="saveContent()">Save</button>
+  <h1>Checking QR Code...</h1>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyDY3ENMrg8mF4KJxWmFYa8f-cvP7j4eZIA",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "594607308243",
-      appId: "1:594607308243:web:e6ac85c7e78077fcf6c06b"
+      apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
+      authDomain: "qr-sticker-demo.firebaseapp.com",
+      databaseURL: "https://qr-sticker-demo-default-rtdb.firebaseio.com",
+      projectId: "qr-sticker-demo",
+      storageBucket: "qr-sticker-demo.appspot.com",
+      messagingSenderId: "787247635596",
+      appId: "1:787247635596:web:946fb94a38360fc7ac6c77"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
     const params = new URLSearchParams(window.location.search);
-    const pageId = params.get("id");
-    const contentRef = ref(db, "pages/" + pageId + "/content");
+    const id = params.get("id");
 
-    const textarea = document.getElementById("content");
-
-    // Load existing content
-    get(contentRef).then(snapshot => {
-      if (snapshot.exists()) {
-        textarea.value = snapshot.val();
-      }
-    });
-
-    // Save content
-    function saveContent() {
-      set(contentRef, textarea.value).then(() => {
-        alert("Saved!");
+    if (!id) {
+      window.location.href = "index.html";
+    } else {
+      const qrRef = ref(db, `qrCodes/${id}`);
+      get(qrRef).then(snapshot => {
+        if (snapshot.exists() && snapshot.val().template) {
+          const template = snapshot.val().template;
+          window.location.href = `${template}.html?id=${id}`;
+        } else {
+          window.location.href = "index.html?id=" + id;
+        }
+      }).catch(error => {
+        console.error("Error reading data:", error);
+        window.location.href = "index.html?id=" + id;
       });
-    }
-
-    // Reset QR Code
-    function resetQRCode() {
-      if (!pageId) return;
-      if (confirm("Are you sure you want to reset this QR code? All saved data will be lost.")) {
-        remove(ref(db, 'pages/' + pageId))
-          .then(() => {
-            alert("QR code reset. Returning to index.");
-            window.location.href = "index.html?id=" + pageId;
-          })
-          .catch(err => alert("Error resetting: " + err));
-      }
     }
   </script>
 </body>
