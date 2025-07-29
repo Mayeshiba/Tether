@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Assign Page Type</title>
   <style>
     body {
@@ -14,30 +14,34 @@
       height: 100vh;
       background: #f4f4f4;
       margin: 0;
+      text-align: center;
     }
     h1 {
       margin-bottom: 10px;
     }
     button {
       margin: 10px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       font-size: 16px;
       cursor: pointer;
+    }
+    #buttons {
+      display: none;
     }
   </style>
 </head>
 <body>
   <h1>Assign Page Type</h1>
-  <p>This QR code is not yet assigned. What kind of page should it be?</p>
-  <div>
+  <p id="status">Checking QR code status...</p>
+
+  <div id="buttons">
     <button onclick="assignTemplate('car_maintenance')">Car Maintenance</button>
     <button onclick="assignTemplate('furnace_log')">Furnace Log</button>
-    <button onclick="resetQRCode()">Reset QR Code</button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -52,36 +56,36 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get('id');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
 
-    function assignTemplate(templateName) {
-      if (!id) {
-        alert("Missing QR ID in URL.");
-        return;
-      }
+    if (!id) {
+      document.getElementById("status").innerText = "Missing QR code ID in URL.";
+    } else {
+      const qrRef = ref(db, 'qrCodes/' + id);
+      get(qrRef).then(snapshot => {
+        const data = snapshot.val();
+        if (data && data.template) {
+          // Already assigned, redirect to correct page
+          window.location.href = `${data.template}.html?id=${id}`;
+        } else {
+          // Not yet assigned — show assignment buttons
+          document.getElementById("status").innerText = "This QR code is not yet assigned. What kind of page should it be?";
+          document.getElementById("buttons").style.display = "block";
+        }
+      });
+    }
 
-      set(ref(db, 'qrCodes/' + id), {
+    window.assignTemplate = function(templateName) {
+      if (!id) return;
+      const newData = {
         template: templateName,
         createdAt: Date.now()
-      }).then(() => {
+      };
+      set(ref(db, 'qrCodes/' + id), newData).then(() => {
         window.location.href = `${templateName}.html?id=${id}`;
       });
-    }
-
-    function resetQRCode() {
-      if (!id) {
-        alert("Missing QR ID in URL.");
-        return;
-      }
-
-      remove(ref(db, 'qrCodes/' + id)).then(() => {
-        alert("QR Code has been reset.");
-      });
-    }
-
-    window.assignTemplate = assignTemplate;
-    window.resetQRCode = resetQRCode;
+    };
   </script>
 </body>
 </html>
