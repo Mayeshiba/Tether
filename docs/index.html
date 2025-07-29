@@ -2,8 +2,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Assign Page Type</title>
   <style>
     body {
@@ -15,28 +15,34 @@
       height: 100vh;
       background: #f4f4f4;
       margin: 0;
+      text-align: center;
     }
     h1 {
       margin-bottom: 10px;
     }
     button {
       margin: 10px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       font-size: 16px;
       cursor: pointer;
+    }
+    #buttons {
+      display: none;
     }
   </style>
 </head>
 <body>
   <h1>Assign Page Type</h1>
   <p id="status">Checking QR code status...</p>
-  <div id="buttons" style="display:none;">
+
+  <div id="buttons">
     <button onclick="assignTemplate('car_maintenance')">Car Maintenance</button>
     <button onclick="assignTemplate('furnace_log')">Furnace Log</button>
   </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA9A-wvRUMrxQ7_25D-2XYaW9_Nt7eybWo",
@@ -50,34 +56,35 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const params = new URLSearchParams(location.search);
-    const id = params.get("id");
-    const statusText = document.getElementById("status");
-    const buttons = document.getElementById("buttons");
+
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
 
     if (!id) {
-      statusText.textContent = "Missing QR code ID.";
+      document.getElementById("status").innerText = "Missing QR code ID in URL.";
     } else {
-      const refPath = ref(db, 'qrCodes/' + id);
-      get(refPath).then(snapshot => {
-        if (snapshot.exists()) {
-          const template = snapshot.val().template;
-          window.location.href = `${template}.html?id=${id}`;
+      const qrRef = ref(db, 'pages/' + id);
+      get(qrRef).then(snapshot => {
+        const data = snapshot.val();
+        if (data && data.type) {
+          window.location.href = `${data.type}.html?id=${id}`;
         } else {
-          statusText.textContent = "This QR code is not yet assigned. What kind of page should it be?";
-          buttons.style.display = "block";
+          document.getElementById("status").innerText = "This QR code is not yet assigned. What kind of page should it be?";
+          document.getElementById("buttons").style.display = "block";
         }
       });
     }
 
-    window.assignTemplate = function(template) {
-      set(ref(db, 'qrCodes/' + id), {
-        template: template,
+    window.assignTemplate = function(templateName) {
+      if (!id) return;
+      const newData = {
+        type: templateName,
         createdAt: Date.now()
-      }).then(() => {
-        window.location.href = `${template}.html?id=${id}`;
+      };
+      set(ref(db, 'pages/' + id), newData).then(() => {
+        window.location.href = `${templateName}.html?id=${id}`;
       });
-    }
+    };
   </script>
 </body>
 </html>
