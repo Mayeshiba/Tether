@@ -1,69 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Car Maintenance Log</title>
+  <link rel="stylesheet" href="../assets/css/style.css" />
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
+  <div id="vehicle-info">
+    <label>Make: <input id="make" type="text" /></label>
+    <label>Model: <input id="model" type="text" /></label>
+    <label>Year: <input id="year" type="text" /></label>
+    <label>Plate Number: <input id="plate" type="text" /></label>
+    <button onclick="saveVehicleInfo()">Save Vehicle Info</button>
+  </div>
 
-  <form id="entryForm">
-    <input type="text" id="date" placeholder="Date" />
-    <input type="text" id="service" placeholder="Service Performed" required />
-    <input type="text" id="mileage" placeholder="Mileage" />
-    <input type="text" id="notes" placeholder="Notes (optional)" />
-    <button type="submit">Add Entry</button>
-  </form>
+  <div id="log-form">
+    <select id="maintenance-type">
+      <option value="Oil Change">Oil Change</option>
+      <option value="Tire Rotation">Tire Rotation</option>
+      <option value="Brake Inspection">Brake Inspection</option>
+      <option value="Battery Replacement">Battery Replacement</option>
+      <option value="Other">Other</option>
+    </select>
+    <input id="note" placeholder="Notes" />
+    <input id="cost" placeholder="Cost" type="number" step="0.01" />
+    <button onclick="addEntry()">Add Entry</button>
+  </div>
 
-  <button id="resetBtn">Reset QR Code</button>
+  <ul id="entry-list"></ul>
 
-  <h2>Log Entries</h2>
-  <ul id="logList"></ul>
+  <button id="reset-btn" onclick="resetQRCode()" style="margin-top: 3rem; color: red;">
+    Reset Page (This will erase all previous data)
+  </button>
 
   <script type="module">
-    import { db, ref, get, push, set, remove } from "../assets/js/firebase-init.js";
+    import { db, ref, get, set, push, remove } from "../assets/js/firebase-init.js";
 
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    const logRef = ref(db, "qr_codes/" + id + "/entries");
+    const entryList = document.getElementById("entry-list");
 
-    const form = document.getElementById("entryForm");
-    const logList = document.getElementById("logList");
-    const resetBtn = document.getElementById("resetBtn");
+    const makeEl = document.getElementById("make");
+    const modelEl = document.getElementById("model");
+    const yearEl = document.getElementById("year");
+    const plateEl = document.getElementById("plate");
 
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const date = document.getElementById("date").value.trim();
-      const service = document.getElementById("service").value.trim();
-      const mileage = document.getElementById("mileage").value.trim();
-      const notes = document.getElementById("notes").value.trim();
-
-      if (!service) return;
-
-      push(logRef, { date, service, mileage, notes }).then(() => location.reload());
-    });
-
-    get(logRef).then(snapshot => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        for (const key in data) {
-          const entry = data[key];
-          const li = document.createElement("li");
-          li.textContent = `${entry.date || "(no date)"} - ${entry.service} ${entry.mileage ? " @ " + entry.mileage + " miles" : ""}${entry.notes ? " - " + entry.notes : ""}`;
-          logList.appendChild(li);
-        }
+    const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
+    get(vehicleRef).then(snapshot => {
+      const data = snapshot.val();
+      if (data) {
+        makeEl.value = data.make || "";
+        modelEl.value = data.model || "";
+        yearEl.value = data.year || "";
+        plateEl.value = data.plate || "";
       }
     });
 
-    resetBtn.addEventListener("click", () => {
-      if (confirm("Are you sure you want to reset this QR code?")) {
-        const qrRef = ref(db, "qr_codes/" + id);
-        remove(qrRef).then(() => {
-          window.location.href = "../index.html?id=" + id;
+    function saveVehicleInfo() {
+      const info = {
+        make: makeEl.value,
+        model: modelEl.value,
+        year: yearEl.value,
+        plate: plateEl.value
+      };
+      set(vehicleRef, info);
+    }
+
+    const entriesRef = ref(db, `qr_codes/${id}/entries`);
+    get(entriesRef).then(snapshot => {
+      const entries = snapshot.val();
+      if (entries) {
+        Object.values(entries).forEach(displayEntry);
+      }
+    });
+
+    function addEntry() {
+      const type = document.getElementById("maintenance-type").value;
+      const note = document.getElementById("note").value;
+      const cost = document.getElementById("cost").value;
+      const timestamp = new Date().toLocaleString();
+
+      const newEntry = {
+        timestamp,
+        type,
+        note,
+        cost
+      };
+
+      push(entriesRef, newEntry).then(() => {
+        displayEntry(newEntry);
+        document.getElementById("note").value = "";
+        document.getElementById("cost").value = "";
+      });
+    }
+
+    function displayEntry(entry) {
+      const li = document.createElement("li");
+      li.textContent = `${entry.timestamp}: ${entry.type} - ${entry.note} ($${entry.cost})`;
+      entryList.appendChild(li);
+    }
+
+    function resetQRCode() {
+      if (confirm("Are you sure you want to reset this page? This will erase all previous data.")) {
+        remove(ref(db, `qr_codes/${id}`)).then(() => {
+          window.location.href = `../index.html?id=${id}`;
         });
       }
-    });
+    }
   </script>
 </body>
 </html>
