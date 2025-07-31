@@ -1,74 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Car Maintenance Log</title>
 </head>
 <body>
-  <h2>Car Maintenance Log</h2>
-  <ul id="log"></ul>
+  <h1>Car Maintenance Log</h1>
 
   <form id="entryForm">
-    <input type="text" id="note" placeholder="What did you do?" required />
-    <input type="text" id="cost" placeholder="Cost" />
-    <input type="text" id="location" placeholder="Where?" />
+    <input type="text" id="date" placeholder="Date" />
+    <input type="text" id="service" placeholder="Service Performed" required />
+    <input type="text" id="mileage" placeholder="Mileage" />
+    <input type="text" id="notes" placeholder="Notes (optional)" />
     <button type="submit">Add Entry</button>
   </form>
 
   <button id="resetBtn">Reset QR Code</button>
 
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
-  <script>
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-      projectId: "YOUR_PROJECT",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  <h2>Log Entries</h2>
+  <ul id="logList"></ul>
+
+  <script type="module">
+    import { db, ref, get, push, set, remove } from "../assets/js/firebase-init.js";
 
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    const logRef = db.ref('qr_codes/' + id + '/entries');
+    const id = params.get("id");
+    const logRef = ref(db, "qr_codes/" + id + "/entries");
 
-    const logList = document.getElementById('log');
-    logRef.on('value', snapshot => {
-      logList.innerHTML = '';
-      const entries = snapshot.val();
-      if (entries) {
-        Object.values(entries).forEach(entry => {
-          const li = document.createElement('li');
-          li.textContent = `${entry.note} (${entry.cost || 'No cost'}) at ${entry.location || 'Unknown'}`;
+    const form = document.getElementById("entryForm");
+    const logList = document.getElementById("logList");
+    const resetBtn = document.getElementById("resetBtn");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const date = document.getElementById("date").value.trim();
+      const service = document.getElementById("service").value.trim();
+      const mileage = document.getElementById("mileage").value.trim();
+      const notes = document.getElementById("notes").value.trim();
+
+      if (!service) return;
+
+      push(logRef, { date, service, mileage, notes }).then(() => location.reload());
+    });
+
+    get(logRef).then(snapshot => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        for (const key in data) {
+          const entry = data[key];
+          const li = document.createElement("li");
+          li.textContent = `${entry.date || "(no date)"} - ${entry.service} ${entry.mileage ? " @ " + entry.mileage + " miles" : ""}${entry.notes ? " - " + entry.notes : ""}`;
           logList.appendChild(li);
-        });
+        }
       }
     });
 
-    document.getElementById('entryForm').addEventListener('submit', e => {
-      e.preventDefault();
-      const entry = {
-        note: document.getElementById('note').value,
-        cost: document.getElementById('cost').value,
-        location: document.getElementById('location').value,
-        timestamp: Date.now()
-      };
-      logRef.push(entry).then(() => {
-        e.target.reset();
-      });
-    });
-
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      db.ref('qr_codes/' + id).remove().then(() => {
-        window.location.href = 'index.html?id=' + id;
-      });
+    resetBtn.addEventListener("click", () => {
+      if (confirm("Are you sure you want to reset this QR code?")) {
+        const qrRef = ref(db, "qr_codes/" + id);
+        remove(qrRef).then(() => {
+          window.location.href = "../index.html?id=" + id;
+        });
+      }
     });
   </script>
 </body>
 </html>
-
