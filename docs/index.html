@@ -48,7 +48,7 @@
         const data = snapshot.val();
         if (data && data.template) {
           const template = data.template;
-          window.location.href = `templates/${template}.html?id=${id}`;
+          window.location.href = `${template}.html?id=${id}`;  // updated
         } else {
           status.textContent = "Choose a template to assign:";
           templateDiv.style.display = "block";
@@ -78,7 +78,7 @@
         template: chosen,
         entries: []
       }).then(() => {
-        window.location.href = `templates/${chosen}.html?id=${id}`;
+        window.location.href = `${chosen}.html?id=${id}`;  // updated
       });
     }
   </script>
