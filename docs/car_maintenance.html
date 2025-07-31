@@ -26,7 +26,7 @@
     </select>
     <input id="note" placeholder="Notes" />
     <input id="cost" placeholder="Cost" type="number" step="0.01" />
-    <button onclick="addEntry()">Add Entry</button>
+    <button id="add-entry-btn">Add Entry</button>
   </div>
 
   <ul id="entry-list"></ul>
@@ -72,11 +72,13 @@
     get(entriesRef).then(snapshot => {
       const entries = snapshot.val();
       if (entries) {
-        Object.values(entries).forEach(displayEntry);
+        Object.entries(entries).forEach(([key, entry]) => {
+          displayEntry(entry);
+        });
       }
     });
 
-    function addEntry() {
+    document.getElementById("add-entry-btn").addEventListener("click", () => {
       const type = document.getElementById("maintenance-type").value;
       const note = document.getElementById("note").value;
       const cost = document.getElementById("cost").value;
@@ -89,12 +91,16 @@
         cost
       };
 
-      push(entriesRef, newEntry).then(() => {
-        displayEntry(newEntry);
-        document.getElementById("note").value = "";
-        document.getElementById("cost").value = "";
-      });
-    }
+      push(entriesRef, newEntry)
+        .then(() => {
+          displayEntry(newEntry);
+          document.getElementById("note").value = "";
+          document.getElementById("cost").value = "";
+        })
+        .catch((error) => {
+          console.error("Error saving entry:", error);
+        });
+    });
 
     function displayEntry(entry) {
       const li = document.createElement("li");
