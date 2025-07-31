@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Car Maintenance Log</title>
   <link rel="stylesheet" href="../assets/css/style.css" />
 </head>
@@ -10,18 +10,16 @@
   <h1>Car Maintenance Log</h1>
 
   <div id="vehicle-summary" style="margin-bottom: 1rem;"></div>
-  <button id="edit-vehicle-btn" style="display:none;">Edit Vehicle Info</button>
-  <button id="add-vehicle-btn" style="display:none;">Add Vehicle Info</button>
+  <button id="edit-vehicle-btn" style="display: none;">Edit Vehicle Info</button>
+  <button id="add-vehicle-btn" style="display: none;">Add Vehicle Info</button>
 
   <div id="vehicle-info" style="display:none;">
-    <label>Make: <input id="make" type="text" /></label><br/>
-    <label>Model: <input id="model" type="text" /></label><br/>
-    <label>Year: <input id="year" type="text" /></label><br/>
-    <label>Plate: <input id="plate" type="text" /></label><br/>
+    <label>Make: <input id="make" type="text" /></label><br>
+    <label>Model: <input id="model" type="text" /></label><br>
+    <label>Year: <input id="year" type="text" /></label><br>
+    <label>Plate Number: <input id="plate" type="text" /></label><br>
     <button onclick="saveVehicleInfo()">Save Vehicle Info</button>
   </div>
-
-  <hr/>
 
   <div id="log-form">
     <select id="maintenance-type">
@@ -31,121 +29,135 @@
       <option value="Battery Replacement">Battery Replacement</option>
       <option value="Other">Other</option>
     </select>
-    <input id="note" type="text" placeholder="Notes" />
-    <input id="cost" type="text" placeholder="Cost" />
+    <input id="note" placeholder="Notes" />
+    <input id="cost" placeholder="Cost (e.g. 45.99)" type="text" />
     <button id="add-entry-btn">Add Entry</button>
   </div>
 
   <ul id="entry-list"></ul>
 
-  <button id="reset-btn" onclick="resetQRCode()" style="margin-top:3rem;color:red;">
+  <button id="reset-btn" onclick="resetQRCode()" style="margin-top: 3rem; color: red;">
     Reset Page (This will erase all previous data)
   </button>
 
   <script type="module">
     import { db, ref, get, set, push, remove } from "../assets/js/firebase-init.js";
 
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
-    if (!id) {
-      alert("Missing QR code ID in URL.");
-      throw new Error("Missing ID");
-    }
-
-    const makeEl = document.getElementById("make");
-    const modelEl = document.getElementById("model");
-    const yearEl = document.getElementById("year");
-    const plateEl = document.getElementById("plate");
-    const vehicleInfoDiv = document.getElementById("vehicle-info");
-    const vehicleSummary = document.getElementById("vehicle-summary");
-    const editVehicleBtn = document.getElementById("edit-vehicle-btn");
-    const addVehicleBtn = document.getElementById("add-vehicle-btn");
-
-    const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
-    get(vehicleRef).then(snap => {
-      const data = snap.val();
-      if (data) {
-        displayVehicleSummary(data);
-        makeEl.value = data.make;
-        modelEl.value = data.model;
-        yearEl.value = data.year;
-        plateEl.value = data.plate;
-        editVehicleBtn.style.display = "inline-block";
-      } else {
-        addVehicleBtn.style.display = "inline-block";
+    window.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (!id) {
+        alert("Error: No ID found in the URL.");
+        throw new Error("Missing ID");
       }
-    });
 
-    function displayVehicleSummary(data) {
-      vehicleSummary.innerHTML = `<strong>${data.year} ${data.make} ${data.model}</strong> (Plate: ${data.plate})`;
-    }
+      const entryList = document.getElementById("entry-list");
+      const makeEl = document.getElementById("make");
+      const modelEl = document.getElementById("model");
+      const yearEl = document.getElementById("year");
+      const plateEl = document.getElementById("plate");
+      const vehicleInfoDiv = document.getElementById("vehicle-info");
+      const vehicleSummary = document.getElementById("vehicle-summary");
+      const editVehicleBtn = document.getElementById("edit-vehicle-btn");
+      const addVehicleBtn = document.getElementById("add-vehicle-btn");
 
-    window.saveVehicleInfo = function() {
-      const vehicleData = {
-        make: makeEl.value,
-        model: modelEl.value,
-        year: yearEl.value,
-        plate: plateEl.value
-      };
-      set(vehicleRef, vehicleData).then(() => {
-        displayVehicleSummary(vehicleData);
-        vehicleInfoDiv.style.display = "none";
-        editVehicleBtn.style.display = "inline-block";
-        addVehicleBtn.style.display = "none";
-      });
-    };
-
-    editVehicleBtn.addEventListener("click", () => {
-      vehicleInfoDiv.style.display = "block";
-    });
-
-    addVehicleBtn.addEventListener("click", () => {
-      vehicleInfoDiv.style.display = "block";
-    });
-
-    // Logging Entries
-    const entriesRef = ref(db, `qr_codes/${id}/entries`);
-    const entryList = document.getElementById("entry-list");
-
-    function displayEntry(entry) {
-      const li = document.createElement("li");
-      li.textContent = `${entry.timestamp}: ${entry.type} - ${entry.note} ($${entry.cost})`;
-      entryList.appendChild(li);
-    }
-
-    function loadEntries() {
-      get(entriesRef).then(snapshot => {
+      const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
+      get(vehicleRef).then(snapshot => {
         const data = snapshot.val();
         if (data) {
-          entryList.innerHTML = "";
-          Object.values(data).forEach(displayEntry);
+          makeEl.value = data.make || "";
+          modelEl.value = data.model || "";
+          yearEl.value = data.year || "";
+          plateEl.value = data.plate || "";
+          displayVehicleSummary(data);
+          editVehicleBtn.style.display = "inline-block";
+        } else {
+          addVehicleBtn.style.display = "inline-block";
         }
       });
-    }
 
-    document.getElementById("add-entry-btn").addEventListener("click", () => {
-      const type = document.getElementById("maintenance-type").value;
-      const note = document.getElementById("note").value;
-      const cost = document.getElementById("cost").value || "0.00";
-      const timestamp = new Date().toLocaleString();
-
-      const entry = { timestamp, type, note, cost };
-      push(entriesRef, entry).then(() => {
-        displayEntry(entry);
-        document.getElementById("note").value = "";
-        document.getElementById("cost").value = "";
+      editVehicleBtn.addEventListener("click", () => {
+        vehicleSummary.innerHTML = "";
+        vehicleInfoDiv.style.display = "block";
       });
-    });
 
-    function resetQRCode() {
-      if (confirm("Are you sure? This will delete all vehicle info and entries.")) {
-        remove(ref(db, `qr_codes/${id}`)).then(() => {
-          window.location.href = `../index.html?id=${id}`;
+      addVehicleBtn.addEventListener("click", () => {
+        vehicleSummary.innerHTML = "";
+        vehicleInfoDiv.style.display = "block";
+      });
+
+      function displayVehicleSummary(info) {
+        vehicleSummary.innerHTML = `<strong>${info.year} ${info.make} ${info.model}</strong> (Plate: ${info.plate})`;
+      }
+
+      window.saveVehicleInfo = function () {
+        const info = {
+          make: makeEl.value,
+          model: modelEl.value,
+          year: yearEl.value,
+          plate: plateEl.value
+        };
+        set(vehicleRef, info).then(() => {
+          displayVehicleSummary(info);
+          vehicleInfoDiv.style.display = "none";
+          editVehicleBtn.style.display = "inline-block";
+          addVehicleBtn.style.display = "none";
+        });
+      };
+
+      const entriesRef = ref(db, `qr_codes/${id}/entries`);
+      function loadEntries() {
+        get(entriesRef).then(snapshot => {
+          const entries = snapshot.val();
+          entryList.innerHTML = "";
+          if (entries) {
+            Object.entries(entries).forEach(([key, entry]) => {
+              displayEntry(entry);
+            });
+          }
         });
       }
-    }
 
-    loadEntries();
+      document.getElementById("add-entry-btn").addEventListener("click", () => {
+        const type = document.getElementById("maintenance-type").value;
+        const note = document.getElementById("note").value;
+        const cost = document.getElementById("cost").value || "0.00";
+        const timestamp = new Date().toLocaleString();
+
+        const newEntry = {
+          timestamp,
+          type,
+          note,
+          cost
+        };
+
+        push(entriesRef, newEntry)
+          .then(() => {
+            loadEntries();
+            document.getElementById("note").value = "";
+            document.getElementById("cost").value = "";
+          })
+          .catch((error) => {
+            console.error("Error saving entry:", error);
+          });
+      });
+
+      function displayEntry(entry) {
+        const li = document.createElement("li");
+        li.textContent = `${entry.timestamp}: ${entry.type} - ${entry.note} ($${entry.cost})`;
+        entryList.appendChild(li);
+      }
+
+      window.resetQRCode = function () {
+        if (confirm("Are you sure you want to reset this page? This will erase all previous data.")) {
+          remove(ref(db, `qr_codes/${id}`)).then(() => {
+            window.location.href = `../index.html?id=${id}`;
+          });
+        }
+      };
+
+      loadEntries();
+    });
   </script>
 </body>
 </html>
