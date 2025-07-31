@@ -3,95 +3,68 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Template</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 2rem;
-      text-align: center;
-    }
-    #selector {
-      display: none;
-      margin-top: 2rem;
-    }
-    select, button {
-      padding: 0.5rem;
-      margin: 0.5rem;
-      font-size: 1rem;
-    }
-  </style>
+  <title>Assign Page Type</title>
 </head>
 <body>
-  <h1>Checking QR Code Status...</h1>
-  <div id="selector">
-    <h2>Select a Template</h2>
-    <select id="templateDropdown"></select><br>
-    <button onclick="submitTemplate()">Submit</button>
+  <h1>QR Code Setup</h1>
+  <div id="status">Checking QR code status...</div>
+  <div id="template-select" style="display:none;">
+    <label for="template">Choose a template:</label>
+    <select id="template"></select>
+    <button onclick="saveTemplate()">Save & Continue</button>
   </div>
 
   <script type="module">
-    import { db, ref, get, set } from './assets/js/firebase-init.js';
+    import { db, ref, get, set } from "./assets/js/firebase-init.js";
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get('id');
-    const selector = document.getElementById('selector');
-    const dropdown = document.getElementById('templateDropdown');
+    const status = document.getElementById("status");
+    const templateDiv = document.getElementById("template-select");
+    const templateSelect = document.getElementById("template");
 
-    async function checkQRCode() {
-      if (!id) {
-        document.querySelector('h1').textContent = 'Error: No ID in URL.';
-        return;
-      }
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
 
-      const qrRef = ref(db, 'qr_codes/' + id);
-      const snapshot = await get(qrRef);
-
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        if (data.template) {
-          const redirectURL = `./${data.template}.html?id=${id}`;
-          window.location.href = redirectURL;
+    if (!id) {
+      status.textContent = "Error: No ID found in URL.";
+    } else {
+      const qrRef = ref(db, "qr_codes/" + id);
+      get(qrRef).then(snapshot => {
+        if (snapshot.exists() && snapshot.val().template) {
+          const template = snapshot.val().template;
+          window.location.href = `templates/${template}.html?id=${id}`;
         } else {
-          document.querySelector('h1').textContent = 'Template missing. Please select one:';
-          showDropdown();
+          status.textContent = "Choose a template to assign:";
+          templateDiv.style.display = "block";
+          loadTemplateOptions();
         }
-      } else {
-        document.querySelector('h1').textContent = 'New QR Code Detected';
-        showDropdown();
-      }
-    }
-
-    async function showDropdown() {
-      selector.style.display = 'block';
-
-      const res = await fetch('./template_registry.json');
-      const templates = await res.json();
-
-      for (const [key, value] of Object.entries(templates)) {
-        const option = document.createElement('option');
-        option.value = key;
-        option.textContent = value.label;
-        dropdown.appendChild(option);
-      }
-    }
-
-    async function submitTemplate() {
-      const selected = dropdown.value;
-      if (!selected) return;
-
-      const newRef = ref(db, 'qr_codes/' + id);
-      await set(newRef, {
-        template: selected,
-        entries: [],
-        created_at: new Date().toISOString(),
-        settings: { public: true },
-        template_version: 1
+      }).catch(error => {
+        status.textContent = "Error loading QR code: " + error;
       });
-
-      window.location.href = `./${selected}.html?id=${id}`;
     }
 
-    checkQRCode();
+    function loadTemplateOptions() {
+      fetch("registry/template_registry.json")
+        .then(res => res.json())
+        .then(data => {
+          for (const key in data) {
+            const opt = document.createElement("option");
+            opt.value = key;
+            opt.textContent = data[key].label;
+            templateSelect.appendChild(opt);
+          }
+        });
+    }
+
+    function saveTemplate() {
+      const chosen = templateSelect.value;
+      const newRef = ref(db, "qr_codes/" + id);
+      set(newRef, {
+        template: chosen,
+        entries: []
+      }).then(() => {
+        window.location.href = `templates/${chosen}.html?id=${id}`;
+      });
+    }
   </script>
 </body>
 </html>
