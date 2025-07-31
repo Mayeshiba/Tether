@@ -1,73 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tether Entry Page</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 2em;
-      background-color: #f8f8f8;
-    }
-    input {
-      padding: 0.5em;
-      margin-right: 0.5em;
-    }
-    button {
-      padding: 0.5em 1em;
-    }
-    #saveStatus {
-      margin-top: 1em;
-      font-weight: bold;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QR Log System</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <h1>Welcome to the QR Log System</h1>
+  <div id="content">Checking QR code status...</div>
 
-  <h1>Welcome to Tether</h1>
-  <p>This is your dynamic entry page. It will eventually load different templates based on the UUID.</p>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
 
-  <h2>Firebase Test</h2>
-  <input type="text" id="testInput" placeholder="Type something..." />
-  <button onclick="saveTest()">Save to Firebase</button>
-  <p id="saveStatus"></p>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js"></script>
-
-  <!-- Firebase Config and Init -->
-  <script>
     const firebaseConfig = {
-      apiKey: "YOUR-API-KEY",
-      authDomain: "your-project-id.firebaseapp.com",
-      projectId: "your-project-id",
-      storageBucket: "your-project-id.appspot.com",
-      messagingSenderId: "YOUR-SENDER-ID",
-      appId: "YOUR-APP-ID"
+      apiKey: "AIzaSyAZoL-7FPJ8Wqz_sX81Fo5eKXpsOVrLUZ0",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
+      measurementId: "G-X7ZQ6bJYEN"
     };
 
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-  </script>
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-  <!-- Test Save Function -->
-  <script>
-    function saveTest() {
-      const input = document.getElementById('testInput').value;
-      db.collection("testMessages").add({
-        text: input,
-        timestamp: new Date()
-      })
-      .then(() => {
-        document.getElementById('saveStatus').innerText = "✅ Saved to Firebase!";
-      })
-      .catch((error) => {
-        document.getElementById('saveStatus').innerText = "❌ Error: " + error;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const content = document.getElementById("content");
+
+    if (id) {
+      const routeRef = ref(db, "routes/" + id);
+      get(routeRef).then(snapshot => {
+        if (snapshot.exists()) {
+          const template = snapshot.val();
+          window.location.href = `${template}.html?id=${id}`;
+        } else {
+          content.innerHTML = `<p style="color:red;">Unknown QR ID: <b>${id}</b></p>`;
+        }
+      }).catch(error => {
+        console.error("Firebase error:", error);
+        content.innerHTML = "<p style='color:red;'>Could not fetch routing data.</p>";
       });
+    } else {
+      content.innerHTML = `
+        <p>No QR code detected. Please scan one or choose below:</p>
+        <ul>
+          <li><a href="car_maintenance.html?id=car_maintenance">Car Maintenance Log</a></li>
+          <li><a href="furnace_log.html?id=furnace_log">Furnace Log</a></li>
+        </ul>
+      `;
     }
   </script>
-
 </body>
 </html>
