@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tether Landing Page</title>
+  <title>Assign Page Type</title>
 </head>
 <body>
-  <h2>Checking QR Code Status...</h2>
-  <div id="template-selection" style="display:none;">
-    <label for="template">Choose a template:</label>
-    <select id="template"></select>
-    <button onclick="saveTemplate()">Save & Continue</button>
+  <h1>Tether QR Setup</h1>
+  <p id="status">Checking QR code status...</p>
+
+  <div id="templateForm" style="display: none;">
+    <label for="templateSelect">Select a template:</label>
+    <select id="templateSelect"></select>
+    <button id="submitBtn">Save & Continue</button>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
@@ -28,43 +30,48 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get('id');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const status = document.getElementById('status');
+    const form = document.getElementById('templateForm');
+    const select = document.getElementById('templateSelect');
 
-    const registryPath = 'template_registry.json';
-
-    fetch(registryPath)
-      .then(response => response.json())
-      .then(templateRegistry => {
-        if (!id) {
-          document.body.innerHTML = "<h3>No ID provided in the URL.</h3>";
-          return;
-        }
-
-        const ref = db.ref('qr_codes/' + id);
-        ref.once('value').then(snapshot => {
-          const data = snapshot.val();
-          if (data && data.template) {
-            window.location.href = `${data.template}.html?id=${id}`;
+    if (!id) {
+      status.innerText = "Error: No ID in URL.";
+    } else {
+      db.ref('qr_codes/' + id + '/template').once('value')
+        .then(snapshot => {
+          const template = snapshot.val();
+          if (template) {
+            // Already assigned, route to page handler
+            window.location.href = `page.html?id=${id}`;
           } else {
-            // show template selection
-            const dropdown = document.getElementById('template');
-            Object.keys(templateRegistry).forEach(key => {
-              const option = document.createElement('option');
-              option.value = key;
-              option.text = templateRegistry[key].label;
-              dropdown.appendChild(option);
+            // Not yet assigned — show dropdown
+            status.innerText = "Please select a template.";
+            form.style.display = 'block';
+
+            fetch('template_registry.json')
+              .then(response => response.json())
+              .then(data => {
+                Object.keys(data).forEach(key => {
+                  const option = document.createElement('option');
+                  option.value = key;
+                  option.innerText = data[key].label || key;
+                  select.appendChild(option);
+                });
+              });
+
+            document.getElementById('submitBtn').addEventListener('click', () => {
+              const selected = select.value;
+              db.ref('qr_codes/' + id).set({
+                template: selected,
+                entries: []
+              }).then(() => {
+                window.location.href = `page.html?id=${id}`;
+              });
             });
-            document.getElementById('template-selection').style.display = 'block';
           }
         });
-      });
-
-    function saveTemplate() {
-      const selectedTemplate = document.getElementById('template').value;
-      db.ref('qr_codes/' + id).set({ template: selectedTemplate }).then(() => {
-        window.location.href = `${selectedTemplate}.html?id=${id}`;
-      });
     }
   </script>
 </body>
