@@ -8,6 +8,7 @@
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
+
   <div id="vehicle-summary" style="margin-bottom: 1rem;"></div>
   <button id="edit-vehicle-btn" style="display: none;">Edit Vehicle Info</button>
   <button id="add-vehicle-btn" style="display: none;">Add Vehicle Info</button>
@@ -20,7 +21,7 @@
     <button onclick="saveVehicleInfo()">Save Vehicle Info</button>
   </div>
 
-  <div id="log-form">
+  <div id="log-form" style="margin-top: 1.5rem;">
     <select id="maintenance-type">
       <option value="Oil Change">Oil Change</option>
       <option value="Tire Rotation">Tire Rotation</option>
@@ -29,11 +30,11 @@
       <option value="Other">Other</option>
     </select>
     <input id="note" placeholder="Notes" />
-    <input id="cost" placeholder="Cost" type="text" />
+    <input id="cost" placeholder="Cost (e.g. 45.00)" type="text" inputmode="decimal" />
     <button id="add-entry-btn">Add Entry</button>
   </div>
 
-  <ul id="entry-list"></ul>
+  <ul id="entry-list" style="margin-top: 2rem;"></ul>
 
   <button id="reset-btn" onclick="resetQRCode()" style="margin-top: 3rem; color: red;">
     Reset Page (This will erase all previous data)
@@ -60,6 +61,7 @@
     const addVehicleBtn = document.getElementById("add-vehicle-btn");
 
     const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
+
     get(vehicleRef).then(snapshot => {
       const data = snapshot.val();
       if (data) {
