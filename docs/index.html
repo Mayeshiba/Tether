@@ -19,7 +19,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
   <script>
-    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
@@ -31,7 +30,6 @@
       measurementId: "G-X7ZQ6DJYEN"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -46,9 +44,10 @@
       status.textContent = "Error: No ID found in URL.";
     } else {
       const qrRef = db.ref("qr_codes/" + id);
-      qrRef.get().then(snapshot => {
-        if (snapshot.exists() && snapshot.val().template) {
-          const template = snapshot.val().template;
+      qrRef.once("value").then(snapshot => {
+        const data = snapshot.val();
+        if (data && data.template) {
+          const template = data.template;
           window.location.href = `templates/${template}.html?id=${id}`;
         } else {
           status.textContent = "Choose a template to assign:";
