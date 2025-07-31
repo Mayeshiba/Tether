@@ -2,22 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Car Maintenance Log</title>
-  <link rel="stylesheet" href="./assets/css/style.css" />
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    input, select, button { margin: 0.5rem; }
+    #vehicle-info { margin-top: 1rem; }
+    #entry-list li { margin-top: 0.25rem; }
+  </style>
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
-
-  <div id="vehicle-summary" style="margin-bottom: 1rem;"></div>
+  <div id="vehicle-summary"></div>
   <button id="edit-vehicle-btn" style="display:none;">Edit Vehicle Info</button>
   <button id="add-vehicle-btn" style="display:none;">Add Vehicle Info</button>
 
-  <div id="vehicle-info" style="display:none; margin-bottom: 1rem;">
-    <label>Make: <input id="make" type="text" /></label><br>
-    <label>Model: <input id="model" type="text" /></label><br>
-    <label>Year: <input id="year" type="text" /></label><br>
-    <label>Plate Number: <input id="plate" type="text" /></label><br>
+  <div id="vehicle-info" style="display:none;">
+    <label>Make: <input id="make" /></label><br />
+    <label>Model: <input id="model" /></label><br />
+    <label>Year: <input id="year" /></label><br />
+    <label>Plate Number: <input id="plate" /></label><br />
     <button onclick="saveVehicleInfo()">Save Vehicle Info</button>
   </div>
 
@@ -30,7 +34,7 @@
       <option value="Other">Other</option>
     </select>
     <input id="note" placeholder="Notes" />
-    <input id="cost" placeholder="Cost (e.g. 45.99)" type="text" />
+    <input id="cost" placeholder="Cost (e.g. 45.99)" />
     <button id="add-entry-btn">Add Entry</button>
   </div>
 
@@ -41,14 +45,25 @@
   </button>
 
   <script type="module">
-    import { db, ref, get, set, push, remove } from "./assets/js/firebase-init.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, get, set, push, remove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    if (!id) {
-      alert("Error: No ID found in the URL.");
-      throw new Error("Missing ID");
-    }
+    if (!id) throw new Error("Missing ID");
 
     const entryList = document.getElementById("entry-list");
     const makeEl = document.getElementById("make");
@@ -76,10 +91,12 @@
     });
 
     editVehicleBtn.addEventListener("click", () => {
+      vehicleSummary.innerHTML = "";
       vehicleInfoDiv.style.display = "block";
     });
 
     addVehicleBtn.addEventListener("click", () => {
+      vehicleSummary.innerHTML = "";
       vehicleInfoDiv.style.display = "block";
     });
 
@@ -105,14 +122,18 @@
     const entriesRef = ref(db, `qr_codes/${id}/entries`);
     function loadEntries() {
       get(entriesRef).then(snapshot => {
+        entryList.innerHTML = "";
         const entries = snapshot.val();
         if (entries) {
-          entryList.innerHTML = "";
-          Object.entries(entries).forEach(([key, entry]) => {
-            displayEntry(entry);
-          });
+          Object.values(entries).forEach(displayEntry);
         }
       });
+    }
+
+    function displayEntry(entry) {
+      const li = document.createElement("li");
+      li.textContent = `${entry.timestamp}: ${entry.type} - ${entry.note} ($${entry.cost})`;
+      entryList.appendChild(li);
     }
 
     document.getElementById("add-entry-btn").addEventListener("click", () => {
@@ -121,34 +142,19 @@
       const cost = document.getElementById("cost").value || "0.00";
       const timestamp = new Date().toLocaleString();
 
-      const newEntry = {
-        timestamp,
-        type,
-        note,
-        cost
-      };
+      const newEntry = { timestamp, type, note, cost };
 
-      push(entriesRef, newEntry)
-        .then(() => {
-          loadEntries();
-          document.getElementById("note").value = "";
-          document.getElementById("cost").value = "";
-        })
-        .catch((error) => {
-          console.error("Error saving entry:", error);
-        });
+      push(entriesRef, newEntry).then(() => {
+        loadEntries();
+        document.getElementById("note").value = "";
+        document.getElementById("cost").value = "";
+      });
     });
-
-    function displayEntry(entry) {
-      const li = document.createElement("li");
-      li.textContent = `${entry.timestamp}: ${entry.type} - ${entry.note} ($${entry.cost})`;
-      entryList.appendChild(li);
-    }
 
     function resetQRCode() {
       if (confirm("Are you sure you want to reset this page? This will erase all previous data.")) {
         remove(ref(db, `qr_codes/${id}`)).then(() => {
-          window.location.href = `index.html?id=${id}`;
+          window.location.href = `../index.html?id=${id}`;
         });
       }
     }
