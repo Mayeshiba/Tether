@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tether Landing Page</title>
+</head>
+<body>
+  <h2>Checking QR Code Status...</h2>
+  <div id="template-selection" style="display:none;">
+    <label for="template">Choose a template:</label>
+    <select id="template"></select>
+    <button onclick="saveTemplate()">Save & Continue</button>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
+
+    const registryPath = 'template_registry.json';
+
+    fetch(registryPath)
+      .then(response => response.json())
+      .then(templateRegistry => {
+        if (!id) {
+          document.body.innerHTML = "<h3>No ID provided in the URL.</h3>";
+          return;
+        }
+
+        const ref = db.ref('qr_codes/' + id);
+        ref.once('value').then(snapshot => {
+          const data = snapshot.val();
+          if (data && data.template) {
+            window.location.href = `${data.template}.html?id=${id}`;
+          } else {
+            // show template selection
+            const dropdown = document.getElementById('template');
+            Object.keys(templateRegistry).forEach(key => {
+              const option = document.createElement('option');
+              option.value = key;
+              option.text = templateRegistry[key].label;
+              dropdown.appendChild(option);
+            });
+            document.getElementById('template-selection').style.display = 'block';
+          }
+        });
+      });
+
+    function saveTemplate() {
+      const selectedTemplate = document.getElementById('template').value;
+      db.ref('qr_codes/' + id).set({ template: selectedTemplate }).then(() => {
+        window.location.href = `${selectedTemplate}.html?id=${id}`;
+      });
+    }
+  </script>
+</body>
+</html>
