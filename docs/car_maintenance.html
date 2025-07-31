@@ -8,7 +8,10 @@
 </head>
 <body>
   <h1>Car Maintenance Log</h1>
-  <div id="vehicle-info">
+  <div id="vehicle-summary" style="margin-bottom: 1rem;"></div>
+  <button id="edit-vehicle-btn">Edit Vehicle Info</button>
+
+  <div id="vehicle-info" style="display:none;">
     <label>Make: <input id="make" type="text" /></label>
     <label>Model: <input id="model" type="text" /></label>
     <label>Year: <input id="year" type="text" /></label>
@@ -46,6 +49,9 @@
     const modelEl = document.getElementById("model");
     const yearEl = document.getElementById("year");
     const plateEl = document.getElementById("plate");
+    const vehicleInfoDiv = document.getElementById("vehicle-info");
+    const vehicleSummary = document.getElementById("vehicle-summary");
+    const editVehicleBtn = document.getElementById("edit-vehicle-btn");
 
     const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
     get(vehicleRef).then(snapshot => {
@@ -55,8 +61,19 @@
         modelEl.value = data.model || "";
         yearEl.value = data.year || "";
         plateEl.value = data.plate || "";
+        displayVehicleSummary(data);
+      } else {
+        vehicleInfoDiv.style.display = "block";
       }
     });
+
+    editVehicleBtn.addEventListener("click", () => {
+      vehicleInfoDiv.style.display = "block";
+    });
+
+    function displayVehicleSummary(info) {
+      vehicleSummary.innerHTML = `<strong>${info.year} ${info.make} ${info.model}</strong> (Plate: ${info.plate})`;
+    }
 
     function saveVehicleInfo() {
       const info = {
@@ -65,18 +82,24 @@
         year: yearEl.value,
         plate: plateEl.value
       };
-      set(vehicleRef, info);
+      set(vehicleRef, info).then(() => {
+        displayVehicleSummary(info);
+        vehicleInfoDiv.style.display = "none";
+      });
     }
 
     const entriesRef = ref(db, `qr_codes/${id}/entries`);
-    get(entriesRef).then(snapshot => {
-      const entries = snapshot.val();
-      if (entries) {
-        Object.entries(entries).forEach(([key, entry]) => {
-          displayEntry(entry);
-        });
-      }
-    });
+    function loadEntries() {
+      get(entriesRef).then(snapshot => {
+        const entries = snapshot.val();
+        if (entries) {
+          entryList.innerHTML = "";
+          Object.entries(entries).forEach(([key, entry]) => {
+            displayEntry(entry);
+          });
+        }
+      });
+    }
 
     document.getElementById("add-entry-btn").addEventListener("click", () => {
       const type = document.getElementById("maintenance-type").value;
@@ -93,7 +116,7 @@
 
       push(entriesRef, newEntry)
         .then(() => {
-          displayEntry(newEntry);
+          loadEntries();
           document.getElementById("note").value = "";
           document.getElementById("cost").value = "";
         })
@@ -115,6 +138,8 @@
         });
       }
     }
+
+    loadEntries();
   </script>
 </body>
 </html>
