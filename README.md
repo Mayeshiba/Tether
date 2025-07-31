@@ -21,7 +21,5 @@ Each QR code points to a unique web page. When scanned, it pulls up a log templa
 - Car Maintenance Log (`/logs/car-maintenance.html`)
 - Furnace Filter Log (`/logs/furnace-log.html`)
 
-## 📦 How to Test
 
-You can view the live demo at:
 
