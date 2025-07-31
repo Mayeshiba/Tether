@@ -151,6 +151,8 @@
             noEntriesMessage: document.getElementById("no-entries-message"),
             resetBtn: document.getElementById("reset-btn"),
             confirmModal: document.getElementById("confirm-modal"),
+            modalTitle: document.getElementById("modal-title"),
+            modalMessage: document.getElementById("modal-message"),
             modalConfirmBtn: document.getElementById("modal-confirm-btn"),
             modalCancelBtn: document.getElementById("modal-cancel-btn"),
         };
@@ -164,7 +166,6 @@
          * Initializes Firebase and sets up authentication.
          */
         async function initializeFirebase() {
-            // Use environment variables provided by the Canvas environment
             const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
             appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
@@ -185,7 +186,6 @@
                     el.loadingState.textContent = "Loading vehicle data...";
                     setupRealtimeListeners();
                 } else {
-                    console.log("No user signed in. Signing in anonymously...");
                     try {
                          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
@@ -205,7 +205,7 @@
          * @param {boolean} enabled - Whether the form should be enabled.
          */
         function setLogFormEnabled(enabled) {
-            el.logFormCard.style.display = 'block'; // Always show the card
+            el.logFormCard.style.display = 'block';
             const formElements = [el.maintenanceType, el.costInput, el.noteInput, el.addEntryBtn];
             const disabledMessageEl = el.logFormCard.querySelector('.disabled-message');
 
@@ -233,11 +233,9 @@
         function setupRealtimeListeners() {
             if (!userId) return;
 
-            // Detach previous listeners if they exist
             if (vehicleUnsubscribe) vehicleUnsubscribe();
             if (entriesUnsubscribe) entriesUnsubscribe();
 
-            // Listener for vehicle information
             const vehicleDocRef = doc(db, "artifacts", appId, "users", userId, "vehicle");
             vehicleUnsubscribe = onSnapshot(vehicleDocRef, (docSnap) => {
                 el.loadingState.style.display = 'none';
@@ -258,7 +256,6 @@
                 el.loadingState.textContent = "Error loading vehicle data.";
             });
 
-            // Listener for maintenance entries
             const entriesColRef = collection(db, "artifacts", appId, "users", userId, "entries");
             const q = query(entriesColRef); 
             entriesUnsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -267,11 +264,7 @@
                     el.noEntriesMessage.style.display = 'block';
                 } else {
                     el.noEntriesMessage.style.display = 'none';
-                    const entries = [];
-                    querySnapshot.forEach((doc) => {
-                        entries.push({ id: doc.id, ...doc.data() });
-                    });
-                    // Sort in memory to avoid needing a composite index in Firestore
+                    const entries = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     entries.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
                     entries.forEach(displayEntry);
                 }
@@ -280,10 +273,6 @@
             });
         }
 
-        /**
-         * Displays the vehicle summary information.
-         * @param {object} info - The vehicle data.
-         */
         function displayVehicleSummary(info) {
             el.vehicleSummaryText.textContent = `${info.year || ''} ${info.make || ''} ${info.model || ''} (Plate: ${info.plate || 'N/A'})`;
             el.makeInput.value = info.make || '';
@@ -292,9 +281,6 @@
             el.plateInput.value = info.plate || '';
         }
 
-        /**
-         * Saves or updates the vehicle information in Firestore.
-         */
         async function saveVehicleInfo() {
             const info = {
                 make: el.makeInput.value.trim(),
@@ -302,60 +288,63 @@
                 year: el.yearInput.value.trim(),
                 plate: el.plateInput.value.trim()
             };
+
+            if (!info.make || !info.model || !info.year || !info.plate) {
+                showModal("Missing Information", "Please fill out all vehicle detail fields before saving.", null, { isAlert: true });
+                return;
+            }
+
             const vehicleDocRef = doc(db, "artifacts", appId, "users", userId, "vehicle");
+            el.saveVehicleBtn.disabled = true;
+            el.saveVehicleBtn.textContent = 'Saving...';
             try {
                 await setDoc(vehicleDocRef, info);
                 console.log("Vehicle info saved.");
-                el.vehicleInfoForm.style.display = 'none';
-                el.vehicleSummaryCard.style.display = 'block';
             } catch (error) {
                 console.error("Error saving vehicle info: ", error);
-                alert("Could not save vehicle info. Please try again.");
+                showModal("Save Error", "Could not save vehicle info. Please check your connection and try again.", null, { isAlert: true });
+            } finally {
+                el.saveVehicleBtn.disabled = false;
+                el.saveVehicleBtn.textContent = 'Save Vehicle';
             }
         }
 
-        /**
-         * Adds a new maintenance entry to Firestore.
-         */
         async function addEntry() {
             const costValue = parseFloat(el.costInput.value);
             const newEntry = {
                 type: el.maintenanceType.value,
                 note: el.noteInput.value.trim(),
                 cost: isNaN(costValue) ? 0 : costValue,
-                timestamp: new Date() // Firestore will convert this to a Timestamp object
+                timestamp: new Date()
             };
 
             if (!newEntry.type) {
-                alert("Please select a maintenance type.");
+                showModal("Invalid Input", "Please select a maintenance type.", null, { isAlert: true });
                 return;
             }
-
+            
+            el.addEntryBtn.disabled = true;
+            el.addEntryBtn.textContent = 'Adding...';
             try {
                 const entriesColRef = collection(db, "artifacts", appId, "users", userId, "entries");
                 await addDoc(entriesColRef, newEntry);
-                console.log("New entry added.");
-                // Clear form fields
                 el.noteInput.value = '';
                 el.costInput.value = '';
                 el.maintenanceType.value = 'Oil Change';
             } catch (error) {
                 console.error("Error adding new entry: ", error);
-                alert("Could not add entry. Please try again.");
+                showModal("Error", "Could not add entry. Please try again.", null, { isAlert: true });
+            } finally {
+                el.addEntryBtn.disabled = false;
+                el.addEntryBtn.textContent = 'Add Entry';
             }
         }
 
-        /**
-         * Renders a single maintenance entry in the list.
-         * @param {object} entry - The maintenance entry data.
-         */
         function displayEntry(entry) {
             const li = document.createElement("li");
             li.className = "p-4 border-b border-gray-200 flex justify-between items-start";
-            
             const date = entry.timestamp.toDate().toLocaleString();
-            const cost = entry.cost.toFixed(2);
-
+            const cost = (entry.cost || 0).toFixed(2);
             li.innerHTML = `
                 <div>
                     <p class="font-semibold text-indigo-600">${entry.type}</p>
@@ -367,40 +356,31 @@
             el.entryList.appendChild(li);
         }
 
-        /**
-         * Deletes a specific maintenance entry.
-         * @param {string} entryId - The ID of the document to delete.
-         */
         async function deleteEntry(entryId) {
             const entryDocRef = doc(db, "artifacts", appId, "users", userId, "entries", entryId);
             try {
                 await deleteDoc(entryDocRef);
-                console.log("Entry deleted:", entryId);
             } catch (error) {
                 console.error("Error deleting entry:", error);
-                alert("Could not delete entry.");
+                showModal("Error", "Could not delete the entry.", null, { isAlert: true });
             }
         }
         
-        /**
-         * Shows a confirmation modal.
-         * @param {string} title - The title for the modal.
-         * @param {string} message - The message for the modal.
-         * @param {function} onConfirm - The callback function to execute on confirmation.
-         */
-        function showConfirmModal(title, message, onConfirm) {
-            document.getElementById('modal-title').textContent = title;
-            document.getElementById('modal-message').textContent = message;
+        function showModal(title, message, onConfirm, options = {}) {
+            const { isAlert = false } = options;
+            el.modalTitle.textContent = title;
+            el.modalMessage.textContent = message;
+            
+            el.modalCancelBtn.style.display = isAlert ? 'none' : 'inline-flex';
+            el.modalConfirmBtn.textContent = isAlert ? 'OK' : 'Confirm';
             el.confirmModal.style.display = 'flex';
 
             const confirmHandler = () => {
-                onConfirm();
+                if (onConfirm) onConfirm();
                 hideModal();
             };
             
-            const cancelHandler = () => {
-                hideModal();
-            };
+            const cancelHandler = () => hideModal();
 
             const hideModal = () => {
                 el.confirmModal.style.display = 'none';
@@ -425,8 +405,7 @@
         
         el.cancelEditVehicleBtn.addEventListener("click", () => {
              el.vehicleInfoForm.style.display = 'none';
-             // Only show summary card if vehicle data actually exists
-             if (el.vehicleSummaryText.textContent) {
+             if (el.vehicleSummaryText.textContent.trim()) {
                  el.vehicleSummaryCard.style.display = 'block';
              } else {
                  el.addVehicleBtn.style.display = 'block';
@@ -439,7 +418,7 @@
         el.entryList.addEventListener("click", (e) => {
             if (e.target.classList.contains("delete-entry-btn")) {
                 const entryId = e.target.getAttribute("data-id");
-                showConfirmModal(
+                showModal(
                     "Delete Entry?",
                     "Are you sure you want to delete this maintenance entry? This cannot be undone.",
                     () => deleteEntry(entryId)
@@ -448,24 +427,20 @@
         });
         
         el.resetBtn.addEventListener("click", () => {
-            showConfirmModal(
+            showModal(
                 "Reset All Data?",
                 "This will permanently delete all vehicle and maintenance data for this log. Are you absolutely sure?",
                 async () => {
-                    console.log("Resetting all data...");
-                    // This is a simplified reset. A more robust solution would use Cloud Functions.
-                    // For now, we delete the vehicle doc. Entries would need to be deleted one-by-one.
                     const vehicleDocRef = doc(db, "artifacts", appId, "users", userId, "vehicle");
                     await deleteDoc(vehicleDocRef);
+                    // A full reset would also delete all entries. For simplicity, we reload.
                     window.location.reload();
                 }
             );
         });
 
-
         // --- App Initialization ---
         initializeFirebase();
-
     </script>
 </body>
 </html>
