@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QR Log System</title>
-  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <h1>Welcome to the QR Log System</h1>
@@ -39,7 +38,7 @@
           const template = snapshot.val();
           window.location.href = `${template}.html?id=${id}`;
         } else {
-          content.innerHTML = `<p style="color:red;">Unknown QR ID: <b>${id}</b></p>`;
+          content.innerHTML = `<p style="color:red;">No route found for ID: <b>${id}</b></p>`;
         }
       }).catch(error => {
         console.error("Firebase error:", error);
@@ -47,11 +46,9 @@
       });
     } else {
       content.innerHTML = `
-        <p>No QR code detected. Please scan one or choose below:</p>
-        <ul>
-          <li><a href="car_maintenance.html?id=car_maintenance">Car Maintenance Log</a></li>
-          <li><a href="furnace_log.html?id=furnace_log">Furnace Log</a></li>
-        </ul>
+        <p>No QR ID provided in URL.</p>
+        <p>You can simulate by visiting:</p>
+        <code>?id=abc123</code>
       `;
     }
   </script>
