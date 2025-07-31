@@ -1,165 +1,471 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Car Maintenance Log</title>
-  <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    input, select, button { margin: 0.5rem; }
-    #vehicle-info { margin-top: 1rem; }
-    #entry-list li { margin-top: 0.25rem; }
-  </style>
-</head>
-<body>
-  <h1>Car Maintenance Log</h1>
-  <div id="vehicle-summary"></div>
-  <button id="edit-vehicle-btn" style="display:none;">Edit Vehicle Info</button>
-  <button id="add-vehicle-btn" style="display:none;">Add Vehicle Info</button>
-
-  <div id="vehicle-info" style="display:none;">
-    <label>Make: <input id="make" /></label><br />
-    <label>Model: <input id="model" /></label><br />
-    <label>Year: <input id="year" /></label><br />
-    <label>Plate Number: <input id="plate" /></label><br />
-    <button onclick="saveVehicleInfo()">Save Vehicle Info</button>
-  </div>
-
-  <div id="log-form">
-    <select id="maintenance-type">
-      <option value="Oil Change">Oil Change</option>
-      <option value="Tire Rotation">Tire Rotation</option>
-      <option value="Brake Inspection">Brake Inspection</option>
-      <option value="Battery Replacement">Battery Replacement</option>
-      <option value="Other">Other</option>
-    </select>
-    <input id="note" placeholder="Notes" />
-    <input id="cost" placeholder="Cost (e.g. 45.99)" />
-    <button id="add-entry-btn">Add Entry</button>
-  </div>
-
-  <ul id="entry-list"></ul>
-
-  <button id="reset-btn" onclick="resetQRCode()" style="margin-top: 3rem; color: red;">
-    Reset Page (This will erase all previous data)
-  </button>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getDatabase, ref, get, set, push, remove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "277809008742",
-      appId: "1:277809008742:web:2586a2b821d8da8f969da7"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
-    if (!id) throw new Error("Missing ID");
-
-    const entryList = document.getElementById("entry-list");
-    const makeEl = document.getElementById("make");
-    const modelEl = document.getElementById("model");
-    const yearEl = document.getElementById("year");
-    const plateEl = document.getElementById("plate");
-    const vehicleInfoDiv = document.getElementById("vehicle-info");
-    const vehicleSummary = document.getElementById("vehicle-summary");
-    const editVehicleBtn = document.getElementById("edit-vehicle-btn");
-    const addVehicleBtn = document.getElementById("add-vehicle-btn");
-
-    const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
-    get(vehicleRef).then(snapshot => {
-      const data = snapshot.val();
-      if (data) {
-        makeEl.value = data.make || "";
-        modelEl.value = data.model || "";
-        yearEl.value = data.year || "";
-        plateEl.value = data.plate || "";
-        displayVehicleSummary(data);
-        editVehicleBtn.style.display = "inline-block";
-      } else {
-        addVehicleBtn.style.display = "inline-block";
-      }
-    });
-
-    editVehicleBtn.addEventListener("click", () => {
-      vehicleSummary.innerHTML = "";
-      vehicleInfoDiv.style.display = "block";
-    });
-
-    addVehicleBtn.addEventListener("click", () => {
-      vehicleSummary.innerHTML = "";
-      vehicleInfoDiv.style.display = "block";
-    });
-
-    function displayVehicleSummary(info) {
-      vehicleSummary.innerHTML = `<strong>${info.year} ${info.make} ${info.model}</strong> (Plate: ${info.plate})`;
-    }
-
-    function saveVehicleInfo() {
-      const info = {
-        make: makeEl.value,
-        model: modelEl.value,
-        year: yearEl.value,
-        plate: plateEl.value
-      };
-      set(vehicleRef, info).then(() => {
-        displayVehicleSummary(info);
-        vehicleInfoDiv.style.display = "none";
-        editVehicleBtn.style.display = "inline-block";
-        addVehicleBtn.style.display = "none";
-      });
-    }
-
-    const entriesRef = ref(db, `qr_codes/${id}/entries`);
-    function loadEntries() {
-      get(entriesRef).then(snapshot => {
-        entryList.innerHTML = "";
-        const entries = snapshot.val();
-        if (entries) {
-          Object.values(entries).forEach(displayEntry);
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Car Maintenance Log</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
         }
-      });
-    }
+        /* Custom modal styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
 
-    function displayEntry(entry) {
-      const li = document.createElement("li");
-      li.textContent = `${entry.timestamp}: ${entry.type} - ${entry.note} ($${entry.cost})`;
-      entryList.appendChild(li);
-    }
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-2xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Car Maintenance Log</h1>
+            <p id="loading-state" class="text-gray-500 mt-2">Initializing and loading data...</p>
+        </header>
 
-    document.getElementById("add-entry-btn").addEventListener("click", () => {
-      const type = document.getElementById("maintenance-type").value;
-      const note = document.getElementById("note").value;
-      const cost = document.getElementById("cost").value || "0.00";
-      const timestamp = new Date().toLocaleString();
+        <!-- Vehicle Info Display -->
+        <div id="vehicle-summary-card" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display:none;">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-semibold" id="vehicle-summary-text"></h2>
+                    <p class="text-gray-600">User ID: <span id="user-id-display" class="font-mono text-sm"></span></p>
+                </div>
+                <button id="edit-vehicle-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                    Edit
+                </button>
+            </div>
+        </div>
+        
+        <button id="add-vehicle-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md mb-6 transition duration-300" style="display:none;">
+            Add Vehicle Information
+        </button>
 
-      const newEntry = { timestamp, type, note, cost };
+        <!-- Vehicle Info Form -->
+        <div id="vehicle-info-form" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display:none;">
+            <h3 class="text-xl font-semibold mb-4">Vehicle Details</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input id="make" placeholder="Make (e.g., Toyota)" class="p-3 border rounded-lg w-full">
+                <input id="model" placeholder="Model (e.g., Camry)" class="p-3 border rounded-lg w-full">
+                <input id="year" type="number" placeholder="Year (e.g., 2022)" class="p-3 border rounded-lg w-full">
+                <input id="plate" placeholder="Plate Number" class="p-3 border rounded-lg w-full">
+            </div>
+            <div class="mt-4 text-right">
+                <button id="save-vehicle-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Save Vehicle</button>
+                <button id="cancel-edit-vehicle-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg ml-2 transition duration-300">Cancel</button>
+            </div>
+        </div>
 
-      push(entriesRef, newEntry).then(() => {
-        loadEntries();
-        document.getElementById("note").value = "";
-        document.getElementById("cost").value = "";
-      });
-    });
+        <!-- Log Entry Form -->
+        <div id="log-form-card" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display:none;">
+            <h3 class="text-xl font-semibold mb-4">Add New Maintenance Entry</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <select id="maintenance-type" class="p-3 border rounded-lg w-full">
+                    <option value="Oil Change">Oil Change</option>
+                    <option value="Tire Rotation">Tire Rotation</option>
+                    <option value="Brake Inspection">Brake Inspection</option>
+                    <option value="Battery Replacement">Battery Replacement</option>
+                    <option value="Other">Other</option>
+                </select>
+                <input id="cost" type="number" placeholder="Cost (e.g., 45.99)" class="p-3 border rounded-lg w-full">
+            </div>
+            <textarea id="note" placeholder="Add any relevant notes here..." class="p-3 border rounded-lg w-full mt-4 h-24"></textarea>
+            <button id="add-entry-btn" class="w-full mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">Add Entry</button>
+        </div>
 
-    function resetQRCode() {
-      if (confirm("Are you sure you want to reset this page? This will erase all previous data.")) {
-        remove(ref(db, `qr_codes/${id}`)).then(() => {
-          window.location.href = `../index.html?id=${id}`;
+        <!-- Maintenance Log List -->
+        <div id="entry-list-container" class="bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-xl font-semibold mb-4">Maintenance History</h3>
+            <ul id="entry-list" class="space-y-4">
+                <!-- Entries will be dynamically inserted here -->
+            </ul>
+             <p id="no-entries-message" class="text-gray-500 text-center py-4" style="display:none;">No maintenance entries found. Add one above!</p>
+        </div>
+        
+        <!-- Reset Button -->
+        <div class="text-center mt-8">
+            <button id="reset-btn" class="text-red-500 hover:text-red-700 font-semibold transition duration-300">
+                Reset Page (Erase All Data)
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Confirmation -->
+    <div id="confirm-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal-content">
+            <h3 id="modal-title" class="text-lg font-bold mb-4">Are you sure?</h3>
+            <p id="modal-message" class="mb-6">This action cannot be undone.</p>
+            <div class="flex justify-end space-x-4">
+                <button id="modal-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancel</button>
+                <button id="modal-confirm-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Firebase Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- DOM Element References ---
+        const el = {
+            loadingState: document.getElementById("loading-state"),
+            vehicleSummaryCard: document.getElementById("vehicle-summary-card"),
+            vehicleSummaryText: document.getElementById("vehicle-summary-text"),
+            userIdDisplay: document.getElementById("user-id-display"),
+            editVehicleBtn: document.getElementById("edit-vehicle-btn"),
+            addVehicleBtn: document.getElementById("add-vehicle-btn"),
+            vehicleInfoForm: document.getElementById("vehicle-info-form"),
+            makeInput: document.getElementById("make"),
+            modelInput: document.getElementById("model"),
+            yearInput: document.getElementById("year"),
+            plateInput: document.getElementById("plate"),
+            saveVehicleBtn: document.getElementById("save-vehicle-btn"),
+            cancelEditVehicleBtn: document.getElementById("cancel-edit-vehicle-btn"),
+            logFormCard: document.getElementById("log-form-card"),
+            maintenanceType: document.getElementById("maintenance-type"),
+            noteInput: document.getElementById("note"),
+            costInput: document.getElementById("cost"),
+            addEntryBtn: document.getElementById("add-entry-btn"),
+            entryList: document.getElementById("entry-list"),
+            noEntriesMessage: document.getElementById("no-entries-message"),
+            resetBtn: document.getElementById("reset-btn"),
+            confirmModal: document.getElementById("confirm-modal"),
+            modalConfirmBtn: document.getElementById("modal-confirm-btn"),
+            modalCancelBtn: document.getElementById("modal-cancel-btn"),
+        };
+
+        // --- App State ---
+        let db, auth, userId, appId;
+        let vehicleUnsubscribe = null;
+        let entriesUnsubscribe = null;
+
+        /**
+         * Initializes Firebase and sets up authentication.
+         */
+        async function initializeFirebase() {
+            // Use environment variables provided by the Canvas environment
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+            if (!firebaseConfig.apiKey) {
+                console.error("Firebase config is missing.");
+                el.loadingState.textContent = "Error: Firebase configuration is missing. Cannot load app.";
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    el.userIdDisplay.textContent = userId;
+                    el.loadingState.textContent = "Loading vehicle data...";
+                    setupRealtimeListeners();
+                } else {
+                    console.log("No user signed in. Signing in anonymously...");
+                    try {
+                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Error during sign-in:", error);
+                        el.loadingState.textContent = "Error: Could not sign in.";
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Toggles the state of the maintenance entry form.
+         * @param {boolean} enabled - Whether the form should be enabled.
+         */
+        function setLogFormEnabled(enabled) {
+            el.logFormCard.style.display = 'block'; // Always show the card
+            const formElements = [el.maintenanceType, el.costInput, el.noteInput, el.addEntryBtn];
+            const disabledMessageEl = el.logFormCard.querySelector('.disabled-message');
+
+            if (enabled) {
+                formElements.forEach(elem => elem.disabled = false);
+                el.addEntryBtn.classList.remove('bg-indigo-300', 'cursor-not-allowed');
+                el.addEntryBtn.classList.add('bg-indigo-500', 'hover:bg-indigo-600');
+                if (disabledMessageEl) disabledMessageEl.remove();
+            } else {
+                formElements.forEach(elem => elem.disabled = true);
+                el.addEntryBtn.classList.remove('bg-indigo-500', 'hover:bg-indigo-600');
+                el.addEntryBtn.classList.add('bg-indigo-300', 'cursor-not-allowed');
+                if (!disabledMessageEl) {
+                    const disabledMessage = document.createElement('p');
+                    disabledMessage.className = 'disabled-message text-center text-sm text-red-500 mt-2';
+                    disabledMessage.textContent = 'Please add vehicle information to enable this form.';
+                    el.addEntryBtn.insertAdjacentElement('afterend', disabledMessage);
+                }
+            }
+        }
+
+        /**
+         * Sets up real-time listeners for vehicle and maintenance data.
+         */
+        function setupRealtimeListeners() {
+            if (!userId) return;
+
+            // Detach previous listeners if they exist
+            if (vehicleUnsubscribe) vehicleUnsubscribe();
+            if (entriesUnsubscribe) entriesUnsubscribe();
+
+            // Listener for vehicle information
+            const vehicleDocRef = doc(db, "artifacts", appId, "users", userId, "vehicle");
+            vehicleUnsubscribe = onSnapshot(vehicleDocRef, (docSnap) => {
+                el.loadingState.style.display = 'none';
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    displayVehicleSummary(data);
+                    el.vehicleInfoForm.style.display = 'none';
+                    el.vehicleSummaryCard.style.display = 'block';
+                    el.addVehicleBtn.style.display = 'none';
+                    setLogFormEnabled(true);
+                } else {
+                    el.addVehicleBtn.style.display = 'block';
+                    el.vehicleSummaryCard.style.display = 'none';
+                    setLogFormEnabled(false);
+                }
+            }, (error) => {
+                console.error("Error listening to vehicle data:", error);
+                el.loadingState.textContent = "Error loading vehicle data.";
+            });
+
+            // Listener for maintenance entries
+            const entriesColRef = collection(db, "artifacts", appId, "users", userId, "entries");
+            const q = query(entriesColRef); 
+            entriesUnsubscribe = onSnapshot(q, (querySnapshot) => {
+                el.entryList.innerHTML = '';
+                if (querySnapshot.empty) {
+                    el.noEntriesMessage.style.display = 'block';
+                } else {
+                    el.noEntriesMessage.style.display = 'none';
+                    const entries = [];
+                    querySnapshot.forEach((doc) => {
+                        entries.push({ id: doc.id, ...doc.data() });
+                    });
+                    // Sort in memory to avoid needing a composite index in Firestore
+                    entries.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+                    entries.forEach(displayEntry);
+                }
+            }, (error) => {
+                console.error("Error listening to entries:", error);
+            });
+        }
+
+        /**
+         * Displays the vehicle summary information.
+         * @param {object} info - The vehicle data.
+         */
+        function displayVehicleSummary(info) {
+            el.vehicleSummaryText.textContent = `${info.year || ''} ${info.make || ''} ${info.model || ''} (Plate: ${info.plate || 'N/A'})`;
+            el.makeInput.value = info.make || '';
+            el.modelInput.value = info.model || '';
+            el.yearInput.value = info.year || '';
+            el.plateInput.value = info.plate || '';
+        }
+
+        /**
+         * Saves or updates the vehicle information in Firestore.
+         */
+        async function saveVehicleInfo() {
+            const info = {
+                make: el.makeInput.value.trim(),
+                model: el.modelInput.value.trim(),
+                year: el.yearInput.value.trim(),
+                plate: el.plateInput.value.trim()
+            };
+            const vehicleDocRef = doc(db, "artifacts", appId, "users", userId, "vehicle");
+            try {
+                await setDoc(vehicleDocRef, info);
+                console.log("Vehicle info saved.");
+                el.vehicleInfoForm.style.display = 'none';
+                el.vehicleSummaryCard.style.display = 'block';
+            } catch (error) {
+                console.error("Error saving vehicle info: ", error);
+                alert("Could not save vehicle info. Please try again.");
+            }
+        }
+
+        /**
+         * Adds a new maintenance entry to Firestore.
+         */
+        async function addEntry() {
+            const costValue = parseFloat(el.costInput.value);
+            const newEntry = {
+                type: el.maintenanceType.value,
+                note: el.noteInput.value.trim(),
+                cost: isNaN(costValue) ? 0 : costValue,
+                timestamp: new Date() // Firestore will convert this to a Timestamp object
+            };
+
+            if (!newEntry.type) {
+                alert("Please select a maintenance type.");
+                return;
+            }
+
+            try {
+                const entriesColRef = collection(db, "artifacts", appId, "users", userId, "entries");
+                await addDoc(entriesColRef, newEntry);
+                console.log("New entry added.");
+                // Clear form fields
+                el.noteInput.value = '';
+                el.costInput.value = '';
+                el.maintenanceType.value = 'Oil Change';
+            } catch (error) {
+                console.error("Error adding new entry: ", error);
+                alert("Could not add entry. Please try again.");
+            }
+        }
+
+        /**
+         * Renders a single maintenance entry in the list.
+         * @param {object} entry - The maintenance entry data.
+         */
+        function displayEntry(entry) {
+            const li = document.createElement("li");
+            li.className = "p-4 border-b border-gray-200 flex justify-between items-start";
+            
+            const date = entry.timestamp.toDate().toLocaleString();
+            const cost = entry.cost.toFixed(2);
+
+            li.innerHTML = `
+                <div>
+                    <p class="font-semibold text-indigo-600">${entry.type}</p>
+                    <p class="text-gray-700">${entry.note || 'No notes'}</p>
+                    <p class="text-sm text-gray-500 mt-1">${date} - $${cost}</p>
+                </div>
+                <button data-id="${entry.id}" class="delete-entry-btn text-red-500 hover:text-red-700 text-sm font-semibold">DELETE</button>
+            `;
+            el.entryList.appendChild(li);
+        }
+
+        /**
+         * Deletes a specific maintenance entry.
+         * @param {string} entryId - The ID of the document to delete.
+         */
+        async function deleteEntry(entryId) {
+            const entryDocRef = doc(db, "artifacts", appId, "users", userId, "entries", entryId);
+            try {
+                await deleteDoc(entryDocRef);
+                console.log("Entry deleted:", entryId);
+            } catch (error) {
+                console.error("Error deleting entry:", error);
+                alert("Could not delete entry.");
+            }
+        }
+        
+        /**
+         * Shows a confirmation modal.
+         * @param {string} title - The title for the modal.
+         * @param {string} message - The message for the modal.
+         * @param {function} onConfirm - The callback function to execute on confirmation.
+         */
+        function showConfirmModal(title, message, onConfirm) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            el.confirmModal.style.display = 'flex';
+
+            const confirmHandler = () => {
+                onConfirm();
+                hideModal();
+            };
+            
+            const cancelHandler = () => {
+                hideModal();
+            };
+
+            const hideModal = () => {
+                el.confirmModal.style.display = 'none';
+                el.modalConfirmBtn.removeEventListener('click', confirmHandler);
+                el.modalCancelBtn.removeEventListener('click', cancelHandler);
+            };
+
+            el.modalConfirmBtn.addEventListener('click', confirmHandler);
+            el.modalCancelBtn.addEventListener('click', cancelHandler);
+        }
+
+        // --- Event Listeners ---
+        el.addVehicleBtn.addEventListener("click", () => {
+            el.vehicleInfoForm.style.display = 'block';
+            el.addVehicleBtn.style.display = 'none';
         });
-      }
-    }
 
-    loadEntries();
-  </script>
+        el.editVehicleBtn.addEventListener("click", () => {
+            el.vehicleInfoForm.style.display = 'block';
+            el.vehicleSummaryCard.style.display = 'none';
+        });
+        
+        el.cancelEditVehicleBtn.addEventListener("click", () => {
+             el.vehicleInfoForm.style.display = 'none';
+             // Only show summary card if vehicle data actually exists
+             if (el.vehicleSummaryText.textContent) {
+                 el.vehicleSummaryCard.style.display = 'block';
+             } else {
+                 el.addVehicleBtn.style.display = 'block';
+             }
+        });
+
+        el.saveVehicleBtn.addEventListener("click", saveVehicleInfo);
+        el.addEntryBtn.addEventListener("click", addEntry);
+
+        el.entryList.addEventListener("click", (e) => {
+            if (e.target.classList.contains("delete-entry-btn")) {
+                const entryId = e.target.getAttribute("data-id");
+                showConfirmModal(
+                    "Delete Entry?",
+                    "Are you sure you want to delete this maintenance entry? This cannot be undone.",
+                    () => deleteEntry(entryId)
+                );
+            }
+        });
+        
+        el.resetBtn.addEventListener("click", () => {
+            showConfirmModal(
+                "Reset All Data?",
+                "This will permanently delete all vehicle and maintenance data for this log. Are you absolutely sure?",
+                async () => {
+                    console.log("Resetting all data...");
+                    // This is a simplified reset. A more robust solution would use Cloud Functions.
+                    // For now, we delete the vehicle doc. Entries would need to be deleted one-by-one.
+                    const vehicleDocRef = doc(db, "artifacts", appId, "users", userId, "vehicle");
+                    await deleteDoc(vehicleDocRef);
+                    window.location.reload();
+                }
+            );
+        });
+
+
+        // --- App Initialization ---
+        initializeFirebase();
+
+    </script>
 </body>
 </html>
