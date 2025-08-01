@@ -38,8 +38,10 @@
     const entriesRef = ref(db, `qr_codes/${id}/entries`);
     function renderEntries(entries) {
       if (!entries || Object.keys(entries).length === 0) return `<div class="text-gray-500 text-center">No furnace events yet.</div>`;
-      return `<ul class="space-y-4">
-        ${Object.values(entries).map(e => `
+      // Sort entries by timestamp ascending (oldest first)
+      const sortedEntries = Object.values(entries).sort((a, b) => a.timestamp - b.timestamp);
+      return `<ul class="space-y-4 mt-8">
+        ${sortedEntries.map(e => `
           <li class="p-4 border rounded">
             <div>
               <span class="font-bold">${e.event_type}</span>
@@ -79,8 +81,9 @@
       get(entriesRef).then(snap => {
         const entries = snap.val();
         document.getElementById("app").innerHTML = `
-          <div id="entries-list">${renderEntries(entries)}</div>
           ${renderForm()}
+          <hr class="my-6"/>
+          <div id="entries-list">${renderEntries(entries)}</div>
         `;
         document.getElementById("entry-form").onsubmit = async (e) => {
           e.preventDefault();
