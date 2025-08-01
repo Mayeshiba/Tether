@@ -1,6 +1,3 @@
-<!--
-📦 QR Sticker Web App Framework – Full Project Overview
--->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +11,7 @@
     <h1 class="text-2xl font-bold mb-6 text-center">QR Sticker Log System</h1>
     <div id="app"></div>
   </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
@@ -46,26 +44,29 @@
         return;
       }
 
+      // Check if template already set
       const qrRef = ref(db, `qr_codes/${id}`);
       const snap = await get(qrRef);
       const data = snap.val();
-
       if (data && data.template) {
-        window.location.href = `/Tether/docs/generic_log.html?id=${encodeURIComponent(id)}`;
+        // Template chosen already → redirect
+        window.location.href = `/Tether/generic_log.html?id=${encodeURIComponent(id)}`;
         return;
       }
 
-      let registry = {};
-      try {
-        const resp = await fetch("/Tether/registry/template_registry.json");
-        registry = await resp.json();
-      } catch (e) {
-        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error loading template registry.</div>`;
+      // Load templates from Firebase
+      const templatesRef = ref(db, "templates");
+      const templatesSnap = await get(templatesRef);
+      const templates = templatesSnap.val();
+
+      if (!templates) {
+        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error loading templates from Firebase.</div>`;
         return;
       }
 
-      const options = Object.entries(registry)
-        .map(([key, meta]) => `<option value="${key}">${meta.label || key}</option>`)
+      // Build dropdown
+      const options = Object.entries(templates)
+        .map(([key, value]) => `<option value="${key}">${value.label || key}</option>`)
         .join("");
 
       appDiv.innerHTML = `
@@ -80,7 +81,7 @@
         const selected = document.getElementById("template-select").value;
         if (!selected) return;
         await set(qrRef, { template: selected });
-        window.location.href = `/Tether/docs/generic_log.html?id=${encodeURIComponent(id)}`;
+        window.location.href = `/Tether/generic_log.html?id=${encodeURIComponent(id)}`;
       };
     }
 
@@ -88,4 +89,3 @@
   </script>
 </body>
 </html>
-
