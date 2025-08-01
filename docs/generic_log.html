@@ -14,7 +14,7 @@
     <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Template</button>
     <p id="status" class="mt-4 text-center text-sm text-gray-600"></p>
 
-        <div id="log-history" class="mt-8 border-t pt-4">
+    <div id="log-history" class="mt-8 border-t pt-4">
       <h2 class="text-xl font-bold mb-4 text-center">Log History</h2>
       <div id="log-list" class="space-y-4"></div>
     </div>
@@ -63,9 +63,12 @@
           const logEntryDiv = document.createElement("div");
           logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
           
-          const timestamp = new Date(parseInt(key.substring(1))).toLocaleString();
+          // Check if a timestamp exists, otherwise fall back to a default message
+          const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString() : 'N/A';
           
           const logDetails = Object.entries(log)
+            // Filter out the timestamp field from the details list
+            .filter(([field, value]) => field !== 'timestamp')
             .map(([field, value]) => `<strong>${field}:</strong> ${value}`)
             .join("<br>");
 
@@ -152,6 +155,8 @@
         Array.from(form.elements).forEach(input => {
           if (input.name) entries[input.name] = input.value;
         });
+        // Add a proper timestamp to the entry before pushing
+        entries.timestamp = Date.now();
 
         await push(ref(db, `logs/${id}`), entries);
         status.innerText = "Entry saved!";
