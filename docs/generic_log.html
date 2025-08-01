@@ -165,83 +165,94 @@
         const snap = await get(qrRef);
         const qrData = snap.val();
         
-        // MODIFIED: Redirect to index.html if no template is configured for this QR ID
-        if (!qrData || !qrData.template) {
-          console.warn(`QR ID ${currentQrId} has no template configured. Redirecting to index.html.`);
-          window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
-          return; // Stop further execution on this page
+        // MODIFIED LOGIC: Handle unconfigured QRs as default shared logs
+        let template = null;
+        if (qrData && qrData.template) {
+          currentLogScope = qrData.log_scope || 'personal'; // Default to 'personal' if not set
+          const templateRef = ref(db, `templates/${qrData.template}`);
+          const templateSnap = await get(templateRef);
+          template = templateSnap.val();
+
+          if (!template || !template.fields) {
+            // If template is invalid/missing for a configured QR, treat as unconfigured (shared)
+            console.warn(`Configured template '${qrData.template}' for QR ID ${currentQrId} is invalid or missing. Defaulting to shared log.`);
+            currentLogScope = 'shared';
+            template = null; // Ensure template is null for default behavior
+          }
+        } else {
+          // If QR code is NOT configured in qr_codes/{id}, default to 'shared' (Terra)
+          currentLogScope = 'shared';
+          console.log(`QR ID ${currentQrId} is unconfigured. Defaulting to shared log.`);
         }
 
-        currentLogScope = qrData.log_scope || 'personal'; // Default to 'personal' if not set
-        
         // Determine the base path for saving/fetching logs
         if (currentLogScope === 'personal') {
           if (!currentUserId) {
-            throw new Error("User ID is missing for a personal log. Please ensure you are logged in.");
+            // This error should ideally be caught by index.html before redirecting
+            throw new Error("User ID is missing for a personal log. Please ensure you are logged in via index.html.");
           }
           currentLogBasePath = `users/${currentUserId}/logs/${currentQrId}/entries`;
           logHistoryTitle.textContent = "My Log History";
           resetBtn.textContent = "Reset My Log";
-        } else { // 'shared' or any other value
+        } else { // 'shared'
           currentLogBasePath = `shared_logs/${currentQrId}/entries`;
           logHistoryTitle.textContent = "Shared Log History";
           resetBtn.textContent = "Reset Shared Log";
         }
 
-
-        const templateRef = ref(db, `templates/${qrData.template}`);
-        const templateSnap = await get(templateRef);
-        const template = templateSnap.val();
-        if (!template || !template.fields) {
-          // This error should ideally not be hit if qrData.template exists and is valid,
-          // but keeping it for robustness if a template is deleted or corrupted.
-          console.warn(`Template '${qrData.template}' not found or invalid. Redirecting to index.html.`);
-          window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
-          return;
-        }
-
         form.innerHTML = "";
 
-        Object.values(template.fields).forEach((field, idx) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "field-block";
+        // Render form fields based on template or a default if no template
+        if (template && template.fields) {
+          Object.values(template.fields).forEach((field, idx) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "field-block";
 
-          const label = document.createElement("label");
-          label.innerText = field.name || `Field ${idx}`;
-          label.className = "block mb-1 font-medium";
+            const label = document.createElement("label");
+            label.innerText = field.name || `Field ${idx}`;
+            label.className = "block mb-1 font-medium";
 
-          let input;
-          if (field.type === "multichoice" && Array.isArray(field.options)) {
-            input = document.createElement("select");
-            input.className = "w-full p-2 border rounded";
-            field.options.forEach(opt => {
-              const option = document.createElement("option");
-              option.value = opt;
-              option.innerText = opt;
-              input.appendChild(option);
-            });
-          } else if (field.type === "date") {
-            input = document.createElement("input");
-            input.type = "date";
-            input.className = "w-full p-2 border rounded";
-          }
-          else if (field.type === "number") {
-            input = document.createElement("input");
-            input.type = "number";
-            input.className = "w-full p-2 border rounded";
-          }
-          else {
-            input = document.createElement("input");
-            input.type = "text"; // Default to text
-            input.className = "w-full p-2 border rounded";
-          }
+            let input;
+            if (field.type === "multichoice" && Array.isArray(field.options)) {
+              input = document.createElement("select");
+              input.className = "w-full p-2 border rounded";
+              field.options.forEach(opt => {
+                const option = document.createElement("option");
+                option.value = opt;
+                option.innerText = opt;
+                input.appendChild(option);
+              });
+            } else if (field.type === "date") {
+              input = document.createElement("input");
+              input.type = "date";
+              input.className = "w-full p-2 border rounded";
+            }
+            else if (field.type === "number") {
+              input = document.createElement("input");
+              input.type = "number";
+              input.className = "w-full p-2 border rounded";
+            }
+            else {
+              input = document.createElement("input");
+              input.type = "text"; // Default to text
+              input.className = "w-full p-2 border rounded";
+            }
 
-          input.name = field.name;
+            input.name = field.name;
 
-          wrapper.appendChild(label);
-          wrapper.appendChild(input);
-          form.appendChild(wrapper);
-        });
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+            form.appendChild(wrapper);
+          });
+        } else {
+          // Default form for unconfigured/invalid template shared logs
+          form.innerHTML = `
+            <div class="field-block">
+              <label for="default-notes" class="block mb-1 font-medium">Notes:</label>
+              <textarea id="default-notes" name="Notes" class="w-full p-2 border rounded" rows="4" placeholder="Add your notes here..."></textarea>
+            </div>
+          `;
+        }
 
         // Render logs using the determined base path
         await renderLogs();
@@ -288,5 +299,3 @@
 
     main();
   </script>
-</body>
-</html>
