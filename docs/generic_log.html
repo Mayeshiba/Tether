@@ -238,7 +238,7 @@
           currentLogBasePath = `users/${currentUserId}/logs/${currentQrId}/entries`;
           pageTitle.textContent = "Aura Code: Personal Log";
           logHistoryTitle.textContent = "My Log History";
-          resetBtn.textContent = "Reset My Log";
+          resetBtn.textContent = "Unlink QR Code"; // Changed button text
           publicItemDataDiv.classList.remove('hidden'); // Show public data for Aura
           submitBtn.classList.remove('hidden'); // Show submit for Aura
           resetBtn.classList.remove('hidden');
@@ -250,7 +250,7 @@
           currentLogBasePath = `shared_logs/${currentQrId}/entries`;
           pageTitle.textContent = "Terra Code: Shared Log";
           logHistoryTitle.textContent = "Shared Log History";
-          resetBtn.textContent = "Reset Shared Log";
+          resetBtn.textContent = "Unlink QR Code"; // Changed button text
           publicItemDataDiv.classList.add('hidden'); // Hide public data for Terra
           submitBtn.classList.remove('hidden');
           resetBtn.classList.remove('hidden');
@@ -292,9 +292,9 @@
       resetBtn.onclick = async () => {
         let confirmMessage = "";
         if (currentLogScope === 'personal') {
-          confirmMessage = "Are you sure you want to reset YOUR personal log for this item? This will delete all YOUR data for this specific QR code.";
+          confirmMessage = "Are you sure you want to unlink this QR code from your personal log? This will delete all YOUR data for this specific QR code and allow you to re-select a template.";
         } else { // 'shared'
-          confirmMessage = "Are you sure you want to reset this SHARED log for this item? This will delete ALL data for this specific QR code for EVERYONE.";
+          confirmMessage = "Are you sure you want to unlink this QR code? This will delete ALL data for this specific QR code for EVERYONE and allow you to re-select a template.";
         }
 
         if (!confirm(confirmMessage)) {
@@ -303,16 +303,24 @@
         }
 
         try {
-          console.log(`Attempting to remove data from: ${currentLogBasePath}`);
-          await remove(ref(db, currentLogBasePath));
-          console.log("Data removed successfully. Re-rendering logs...");
-          await renderLogs(); // Re-render after reset
-          statusElement.innerText = "Log reset successfully!";
+          // Delete the QR code's configuration (template and log_scope)
+          await remove(ref(db, `qr_codes/${currentQrId}`));
+          console.log(`QR code configuration for ${currentQrId} removed.`);
+
+          // Also delete the associated log entries
+          if (currentLogBasePath) {
+            await remove(ref(db, currentLogBasePath));
+            console.log(`Log entries for ${currentQrId} at ${currentLogBasePath} removed.`);
+          }
+
+          statusElement.innerText = "QR code unlinked successfully! Redirecting...";
           statusElement.className = "mt-4 text-center text-sm text-green-600 font-bold";
-          setTimeout(() => statusElement.innerText = "", 3000);
+          setTimeout(() => {
+            window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`; // Redirect to index to re-select template
+          }, 1500); // Give a moment for the message to be seen
         } catch (error) {
-          console.error("Error resetting log:", error);
-          statusElement.innerText = `Failed to reset log: ${error.message}`;
+          console.error("Error unlinking QR code:", error);
+          statusElement.innerText = `Failed to unlink QR code: ${error.message}`;
           statusElement.className = "mt-4 text-center text-sm text-red-600 font-bold";
         }
       };
