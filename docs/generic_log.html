@@ -2,23 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Generic Log</title>
+  <title>Log Entry Page</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div class="max-w-2xl mx-auto mt-12 bg-white p-6 rounded-lg shadow">
-    <h1 id="log-title" class="text-2xl font-bold mb-6 text-center">Loading...</h1>
-    <form id="entry-form" class="space-y-4"></form>
-    <button id="submit-btn" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Add Entry</button>
-    <hr class="my-6" />
-    <h2 class="text-xl font-semibold mb-4">Log Entries</h2>
-    <div id="entries" class="space-y-4"></div>
+  <div class="max-w-2xl mx-auto mt-12 p-6 bg-white rounded-lg shadow-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Log Entry</h1>
+    <form id="log-form" class="space-y-4"></form>
+    <div class="mt-6 text-center">
+      <button id="save-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Save Entry</button>
+    </div>
+    <div class="mt-6 text-center">
+      <button id="reset-btn" class="text-sm text-red-600 underline">Reset This Log</button>
+    </div>
+    <hr class="my-8" />
+    <div id="log-entries" class="space-y-4"></div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, push, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
@@ -34,118 +38,99 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    function getIdFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("id") || "";
-    }
-
-    const id = getIdFromURL();
+    const id = new URLSearchParams(window.location.search).get("id");
     if (!id) {
-      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Missing QR ID in URL.</div>";
-      throw new Error("No QR ID");
+      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Error: No ID found in URL.</div>";
+      throw new Error("No ID in URL");
     }
 
-    const qrRef = ref(db, `qr_codes/${id}`);
-    const logRef = ref(db, `logs/${id}`);
+    // Load template
+    const templateRef = ref(db, `qr_codes/${id}/template`);
+    const templateSnap = await get(templateRef);
+    const templateKey = templateSnap.val();
 
-    let currentTemplate = null;
+    if (!templateKey) {
+      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Error: No template assigned for this log.</div>";
+      throw new Error("No template found");
+    }
 
-    async function loadTemplate() {
-      const snap = await get(qrRef);
-      const data = snap.val();
-      if (!data || !data.template) {
-        document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>No template assigned to this QR code.</div>";
-        return;
-      }
+    // Load fields
+    const templateDefRef = ref(db, `templates/${templateKey}`);
+    const defSnap = await get(templateDefRef);
+    const template = defSnap.val();
 
-      const templateName = data.template;
-      const templateSnap = await get(ref(db, `templates/${templateName}`));
-      currentTemplate = templateSnap.val();
-      renderForm(currentTemplate);
+    if (!template || !template.fields) {
+      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Error: Template data missing or invalid.</div>";
+      throw new Error("No template data found");
+    }
+
+    // Render form
+    const form = document.getElementById("log-form");
+    template.fields.forEach((field, i) => {
+      const id = `field-${i}`;
+      const label = field.label || `Field ${i + 1}`;
+      const type = field.type || "text";
+
+      form.innerHTML += `
+        <div>
+          <label for="${id}" class="block font-semibold mb-1">${label}</label>
+          <input id="${id}" type="${type}" class="w-full border rounded px-3 py-2" />
+        </div>
+      `;
+    });
+
+    // Save entry
+    document.getElementById("save-btn").onclick = async () => {
+      const values = {};
+      template.fields.forEach((field, i) => {
+        const id = `field-${i}`;
+        values[field.label || `Field ${i + 1}`] = document.getElementById(id).value;
+      });
+
+      const entryRef = ref(db, `logs/${id}`);
+      await push(entryRef, {
+        timestamp: new Date().toISOString(),
+        values
+      });
+
       loadEntries();
-    }
-
-    function renderForm(template) {
-      document.getElementById("log-title").textContent = template.label || "Generic Log";
-
-      const form = document.getElementById("entry-form");
-      form.innerHTML = "";
-
-      template.fields.forEach((field) => {
-        const wrapper = document.createElement("div");
-        const label = document.createElement("label");
-        label.className = "block font-medium mb-1";
-        label.textContent = field.name;
-
-        let input;
-        if (field.type === "dropdown") {
-          input = document.createElement("select");
-          input.className = "w-full border p-2 rounded";
-          field.options.forEach(opt => {
-            const option = document.createElement("option");
-            option.value = opt;
-            option.textContent = opt;
-            input.appendChild(option);
-          });
-        } else {
-          input = document.createElement("input");
-          input.className = "w-full border p-2 rounded";
-          input.type = field.type === "number" ? "number" : "text";
-        }
-
-        input.name = field.name;
-        wrapper.appendChild(label);
-        wrapper.appendChild(input);
-        form.appendChild(wrapper);
-      });
-    }
-
-    document.getElementById("submit-btn").onclick = async () => {
-      const formData = {};
-      currentTemplate.fields.forEach((field) => {
-        const val = document.querySelector(`[name="${field.name}"]`).value;
-        formData[field.name] = val;
-      });
-      formData.timestamp = new Date().toISOString();
-      await push(logRef, formData);
-      loadEntries(); // Refresh log
     };
 
-    function loadEntries() {
-      const entriesDiv = document.getElementById("entries");
-      entriesDiv.innerHTML = "<div class='text-gray-500'>Loading entries...</div>";
+    // Load previous entries
+    async function loadEntries() {
+      const entriesRef = ref(db, `logs/${id}`);
+      const snap = await get(entriesRef);
+      const entries = snap.val() || {};
 
-      onValue(logRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        const keys = Object.keys(data).sort(); // oldest first
-        entriesDiv.innerHTML = "";
+      const container = document.getElementById("log-entries");
+      container.innerHTML = "<h2 class='text-lg font-semibold mb-2'>Previous Entries</h2>";
 
-        keys.forEach((key) => {
-          const entry = data[key];
-          const card = document.createElement("div");
-          card.className = "border p-3 rounded bg-gray-50";
-
-          const time = new Date(entry.timestamp).toLocaleString();
-          const header = document.createElement("div");
-          header.className = "text-sm text-gray-600 mb-2";
-          header.textContent = `Logged at: ${time}`;
-          card.appendChild(header);
-
-          currentTemplate.fields.forEach((field) => {
-            const val = entry[field.name];
-            if (val !== undefined) {
-              const row = document.createElement("div");
-              row.innerHTML = `<strong>${field.name}:</strong> ${val}`;
-              card.appendChild(row);
-            }
-          });
-
-          entriesDiv.appendChild(card);
-        });
+      Object.values(entries).reverse().forEach(entry => {
+        const time = new Date(entry.timestamp).toLocaleString();
+        const items = Object.entries(entry.values)
+          .map(([k, v]) => `<div><strong>${k}:</strong> ${v}</div>`)
+          .join("");
+        container.innerHTML += `
+          <div class="p-4 border rounded">
+            <div class="text-sm text-gray-500 mb-2">${time}</div>
+            ${items}
+          </div>
+        `;
       });
     }
 
-    loadTemplate();
+    loadEntries();
+
+    // Reset log ID
+    document.getElementById("reset-btn").onclick = async () => {
+      const confirmed = confirm("Are you sure you want to reset this log? All entries and settings will be lost.");
+      if (!confirmed) return;
+
+      await set(ref(db, `qr_codes/${id}`), null); // Remove template
+      await set(ref(db, `logs/${id}`), null);     // Remove data
+
+      window.location.href = `index.html?id=${encodeURIComponent(id)}`;
+    };
   </script>
 </body>
 </html>
