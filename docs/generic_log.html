@@ -44,37 +44,45 @@
     const logList = document.getElementById("log-list");
 
     async function renderLogs(id) {
-      console.log("Rendering logs for ID:", id);
+      console.log("renderLogs: Attempting to fetch logs for ID:", id);
       logList.innerHTML = `<p class="text-center text-gray-500">Loading logs...</p>`;
-      const logsRef = ref(db, `logs/${id}`);
-      const snap = await get(logsRef);
-      const logs = snap.val();
-
-      logList.innerHTML = ""; // Clear the loading message
-
-      if (!logs) {
-        logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found.</p>`;
-        return;
-      }
-
-      // Display logs in reverse chronological order
-      const logEntries = Object.entries(logs).reverse();
       
-      logEntries.forEach(([key, log]) => {
-        const logEntryDiv = document.createElement("div");
-        logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
-        
-        // Convert log data to a readable string
-        const logDetails = Object.entries(log)
-          .map(([field, value]) => `<strong>${field}:</strong> ${value}`)
-          .join("<br>");
+      try {
+        const logsRef = ref(db, `logs/${id}`);
+        const snap = await get(logsRef);
+        const logs = snap.val();
 
-        logEntryDiv.innerHTML = `
-          <p class="text-sm text-gray-400 mb-2">Log ID: ${key}</p>
-          <p class="text-gray-800">${logDetails}</p>
-        `;
-        logList.appendChild(logEntryDiv);
-      });
+        console.log("renderLogs: Fetched data from Firebase:", logs);
+        
+        logList.innerHTML = ""; // Clear the loading message
+
+        if (!logs) {
+          console.log("renderLogs: No previous logs found.");
+          logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found.</p>`;
+          return;
+        }
+
+        const logEntries = Object.entries(logs).reverse();
+        console.log("renderLogs: Found log entries:", logEntries.length);
+        
+        logEntries.forEach(([key, log]) => {
+          const logEntryDiv = document.createElement("div");
+          logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
+          
+          const logDetails = Object.entries(log)
+            .map(([field, value]) => `<strong>${field}:</strong> ${value}`)
+            .join("<br>");
+
+          logEntryDiv.innerHTML = `
+            <p class="text-sm text-gray-400 mb-2">Log ID: ${key}</p>
+            <p class="text-gray-800">${logDetails}</p>
+          `;
+          logList.appendChild(logEntryDiv);
+        });
+      } catch (error) {
+        console.error("renderLogs: An error occurred while fetching or rendering logs:", error);
+        logList.innerHTML = `<p class="text-center text-red-600">Error loading logs.</p>`;
+      }
     }
 
     async function main() {
@@ -87,7 +95,6 @@
       }
 
       try {
-        // Load the template for the form
         const qrRef = ref(db, `qr_codes/${id}`);
         const snap = await get(qrRef);
         const data = snap.val();
@@ -136,7 +143,6 @@
           form.appendChild(wrapper);
         });
 
-        // Initial call to render the log history
         await renderLogs(id);
 
       } catch (err) {
@@ -155,7 +161,6 @@
         status.innerText = "Entry saved!";
         setTimeout(() => status.innerText = "", 3000);
         form.reset();
-        // NEW: Re-render the logs after a successful submission
         await renderLogs(id);
       });
 
