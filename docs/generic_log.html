@@ -66,14 +66,15 @@
         return;
       }
 
-      form.innerHTML = "";
-      currentFields = template.fields;
+      // Convert object of fields to array of labels
+      currentFields = Object.values(template.fields).map(f => f.label || "Unnamed Field");
 
-      template.fields.forEach((fieldLabel, i) => {
+      form.innerHTML = "";
+      currentFields.forEach((label, i) => {
         const inputId = `field-${i}`;
         const fieldDiv = document.createElement("div");
         fieldDiv.innerHTML = `
-          <label for="${inputId}" class="block font-medium">${fieldLabel}</label>
+          <label for="${inputId}" class="block font-medium">${label}</label>
           <input type="text" id="${inputId}" class="w-full border rounded px-3 py-2 mt-1" />
         `;
         form.appendChild(fieldDiv);
