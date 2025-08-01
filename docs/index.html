@@ -1,149 +1,100 @@
-Here’s a complete **GitHub Copilot prompt** you can use to describe the full framework of your QR sticker project from scratch. This assumes you want Copilot to help generate, debug, and complete the system — and gives it every relevant piece of context.
+<!--
+📦 QR Sticker Web App Framework – Full Project Overview
+See project architecture and instructions in README.md or at the top of this file.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QR Sticker App – Template Selector</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+  <div class="max-w-lg mx-auto mt-24 bg-white p-8 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold mb-6 text-center">QR Sticker Log System</h1>
+    <div id="app"></div>
+  </div>
+  <script type="module">
+    // --- Firebase Modular SDK ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
----
+    // --- Firebase Config ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
+      measurementId: "G-X7ZQ6DJYEN"
+    };
 
-### ✅ GitHub Copilot Prompt (Paste this in a comment at the top of your main `index.html` or `README.md`)
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-/\*
-📦 **QR Sticker Web App Framework – Full Project Overview**
+    // --- Get id from URL ---
+    function getIdFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id") || "";
+    }
 
-This project is a Firebase + GitHub Pages web app that dynamically responds to QR codes by loading different logging templates. The system is modular, versioned, and scalable.
+    // --- UI Elements ---
+    const appDiv = document.getElementById("app");
 
----
+    // --- Main Logic ---
+    async function main() {
+      const id = getIdFromURL();
+      if (!id) {
+        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: No QR code ID found in URL.</div>`;
+        return;
+      }
 
-## 🔹 Project Architecture
+      // 1. Check DB for template selection
+      const qrRef = ref(db, `qr_codes/${id}`);
+      const snap = await get(qrRef);
+      const data = snap.val();
+      if (data && data.template) {
+        // Template already chosen, redirect to template page
+        window.location.href = `/Tether/templates/${data.template}.html?id=${encodeURIComponent(id)}`;
+        return;
+      }
 
-* Hosted on **GitHub Pages** from the `/docs` folder of the repo:
-  `https://mayeshiba.github.io/Tether/`
+      // 2. No template yet – load registry and offer dropdown
+      let registry = {};
+      try {
+        const resp = await fetch("/Tether/registry/template_registry.json");
+        registry = await resp.json();
+      } catch (e) {
+        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error loading template registry.</div>`;
+        return;
+      }
 
-* Uses **Firebase Realtime Database** to store:
+      // Build dropdown
+      const options = Object.entries(registry)
+        .map(([key, meta]) => `<option value="${key}">${meta.label || key}</option>`)
+        .join("");
+      appDiv.innerHTML = `
+        <div class="mb-6 text-center">
+          <div class="font-semibold mb-2">Select a log template for this QR code:</div>
+          <select id="template-select" class="p-2 border rounded mb-4 w-full">${options}</select>
+          <button id="choose-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded w-full">Set Template</button>
+        </div>
+      `;
 
-  * Template selection
-  * Vehicle or entry data
-  * Reset status
-  * Future support for user ownership, settings, and versioning
+      document.getElementById("choose-btn").onclick = async () => {
+        const selected = document.getElementById("template-select").value;
+        if (!selected) return;
+        // Save choice to DB
+        await set(qrRef, { template: selected });
+        // Redirect to template page
+        window.location.href = `/Tether/templates/${selected}.html?id=${encodeURIComponent(id)}`;
+      };
+    }
 
-* Uses dynamic routing based on the `id` query param in the URL:
-
-  * Example: `https://mayeshiba.github.io/Tether/?id=abc123`
-
----
-
-## 🔹 Behavior on Page Load
-
-1. User visits the site with a URL like `?id=abc123`.
-2. `index.html` extracts the `id` value from the query.
-3. It checks Firebase at `qr_codes/{id}`:
-
-   * If no data exists yet for this ID:
-
-     * Show a dropdown of available templates (from `template_registry.json`)
-     * Save `{ template: selectedTemplate }` to `qr_codes/{id}` in Firebase
-     * Redirect to `/templates/{selectedTemplate}.html?id=abc123`
-   * If a template is already set for the ID:
-
-     * Redirect directly to that template: `/templates/{template}.html?id=abc123`
-
----
-
-## 🔹 Behavior on Template Pages (e.g., `car_maintenance.html`)
-
-Each template page:
-
-* Extracts `id` from the URL
-* Loads the appropriate Firebase node at `qr_codes/{id}` and its `entries` subcollection
-* Displays the relevant log entries
-* Shows a form to add new entries (fields are defined by the template metadata)
-* Offers a “Reset QR Code” button that:
-
-  * Deletes all data under `qr_codes/{id}`
-  * Redirects back to the main selection screen (`/?id=abc123`)
-
----
-
-## 🔹 Template System
-
-* Templates live in `/docs/templates/`
-* Each template is an independent HTML file
-* Shared JavaScript lives in `/docs/assets/js/` (e.g., `firebase-init.js`, `routing.js`)
-* Shared CSS lives in `/docs/assets/css/`
-* Template metadata is stored in `docs/registry/template_registry.json`
-
-### Example `template_registry.json`:
-
-```json
-{
-  "car_maintenance": {
-    "label": "Car Maintenance Log",
-    "file": "car_maintenance.html",
-    "fields": ["maintenance_type", "cost", "note"]
-  },
-  "furnace_log": {
-    "label": "Furnace Filter Log",
-    "file": "furnace_log.html",
-    "fields": ["note"]
-  }
-}
-```
-
-This registry is loaded on the homepage when no template is selected, and powers the dropdown.
-
----
-
-## 🔹 Firebase Project Info
-
-Firebase project name: `tether - web`
-
-### Firebase Config Block:
-
-```js
-const firebaseConfig = {
-  apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
-  authDomain: "tether-71e0c.firebaseapp.com",
-  databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-  projectId: "tether-71e0c",
-  storageBucket: "tether-71e0c.appspot.com",
-  messagingSenderId: "277809008742",
-  appId: "1:277809008742:web:2586a2b821d8da8f969da7",
-  measurementId: "G-X7ZQ6DJYEN"
-};
-```
-
----
-
-## 🔹 Reset Behavior
-
-If the user clicks “Reset QR Code”:
-
-* Delete the entire `qr_codes/{id}` node in Firebase
-* Redirect back to the homepage with the same ID (`/?id=abc123`)
-* The page behaves as if it's a brand new code
-
----
-
-## 🔹 Future Support
-
-The system is structured to allow future features including:
-
-* `qr_codes/{id}/settings` with `public: true/false`
-* `qr_codes/{id}/owner` for linking to Firebase Auth user ID
-* `template_version` for tracking updates to individual templates
-
-This ensures all QR codes remain stable even if templates evolve.
-
----
-
-Please help generate or troubleshoot:
-
-* `index.html` routing logic
-* Template page entry forms
-* Firebase integration bugs
-* Reset behavior
-* Dropdown template selection from JSON
-* Proper initialization using the config above
-
-\*/
-
----
-
-Let me know if you want a separate Copilot prompt for working on **one specific template page**, like `car_maintenance.html`.
+    main();
+  </script>
+</body>
+</html>
