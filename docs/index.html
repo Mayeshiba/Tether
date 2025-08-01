@@ -1,16 +1,70 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Car Maintenance Log</title>
+  <title>Car Maintenance Log - Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+    .hidden { display: none; }
+  </style>
 </head>
-<body>
-  <h1 id="loading-state">Car Maintenance Log</h1>
+<body class="bg-gray-100 text-gray-800">
+  <div class="container mx-auto p-4 max-w-xl">
+    <h1 class="text-3xl font-bold text-center mb-6">Car Maintenance Log</h1>
+
+    <!-- Vehicle Details Summary -->
+    <div id="vehicle-summary-card" class="bg-white p-4 rounded-lg shadow mb-6 hidden">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-xl font-semibold" id="vehicle-summary-text"></h2>
+        </div>
+        <button id="edit-vehicle-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
+          Edit Vehicle Details
+        </button>
+      </div>
+    </div>
+
+    <!-- Vehicle Details Form -->
+    <form id="vehicle-info-form" class="bg-white p-4 rounded-lg shadow mb-6 hidden">
+      <h3 class="text-lg font-semibold mb-4">Enter Vehicle Details</h3>
+      <div class="mb-3">
+        <label for="make" class="block mb-1">Make</label>
+        <input id="make" type="text" class="p-2 border rounded w-full" required />
+      </div>
+      <div class="mb-3">
+        <label for="model" class="block mb-1">Model</label>
+        <input id="model" type="text" class="p-2 border rounded w-full" required />
+      </div>
+      <div class="mb-3">
+        <label for="year" class="block mb-1">Year</label>
+        <input id="year" type="number" min="1900" max="2100" class="p-2 border rounded w-full" required />
+      </div>
+      <div class="mb-3">
+        <label for="plate" class="block mb-1">Plate</label>
+        <input id="plate" type="text" class="p-2 border rounded w-full" required />
+      </div>
+      <div class="flex justify-end space-x-2">
+        <button type="submit" id="save-vehicle-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg">
+          Save Vehicle
+        </button>
+        <button type="button" id="cancel-edit-vehicle-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg hidden">
+          Cancel
+        </button>
+      </div>
+    </form>
+
+    <!-- Loading/Error Message -->
+    <p id="loading-state" class="text-center text-gray-500 mt-4"></p>
+  </div>
+
+  <!-- Firebase Modular SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, set, push, remove, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
+    // Firebase config - double checked!
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
@@ -22,22 +76,123 @@
       measurementId: "G-X7ZQ6DJYEN"
     };
 
-    // THIS IS THE ONLY INITIALIZATION YOU NEED!
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Try a simple test: load something from your DB
-    const loading = document.getElementById("loading-state");
-    const params = new URLSearchParams(location.search);
-    const qrId = params.get("id") || "test";
-    loading.textContent = "Trying to load: " + qrId;
+    // Get the id from the URL query parameter
+    function getIdFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id") || "";
+    }
 
-    const vehicleRef = ref(db, `qr_codes/${qrId}/vehicle`);
-    onValue(vehicleRef, (snapshot) => {
-      loading.textContent = "Vehicle: " + JSON.stringify(snapshot.val());
-    }, (err) => {
-      loading.textContent = "Error: " + err.message;
+    // DOM elements
+    const vehicleSummaryCard = document.getElementById("vehicle-summary-card");
+    const vehicleSummaryText = document.getElementById("vehicle-summary-text");
+    const editVehicleBtn = document.getElementById("edit-vehicle-btn");
+    const vehicleInfoForm = document.getElementById("vehicle-info-form");
+    const makeInput = document.getElementById("make");
+    const modelInput = document.getElementById("model");
+    const yearInput = document.getElementById("year");
+    const plateInput = document.getElementById("plate");
+    const saveVehicleBtn = document.getElementById("save-vehicle-btn");
+    const cancelEditVehicleBtn = document.getElementById("cancel-edit-vehicle-btn");
+    const loadingState = document.getElementById("loading-state");
+
+    let currentId = "";
+    let vehicleRef = null;
+
+    // Helper functions
+    function showForm(info = {}) {
+      vehicleInfoForm.classList.remove("hidden");
+      vehicleSummaryCard.classList.add("hidden");
+      cancelEditVehicleBtn.classList.toggle("hidden", !info.make);
+      makeInput.value = info.make || "";
+      modelInput.value = info.model || "";
+      yearInput.value = info.year || "";
+      plateInput.value = info.plate || "";
+    }
+
+    function showSummary(info) {
+      vehicleSummaryCard.classList.remove("hidden");
+      vehicleInfoForm.classList.add("hidden");
+      vehicleSummaryText.textContent = `${info.year} ${info.make} ${info.model} (Plate: ${info.plate})`;
+    }
+
+    function setLoading(msg) {
+      loadingState.textContent = msg;
+    }
+
+    // Main logic
+    async function main() {
+      setLoading("Loading vehicle info...");
+      currentId = getIdFromURL();
+      if (!currentId) {
+        setLoading("Error: No QR code ID found in URL.");
+        return;
+      }
+      vehicleRef = ref(db, `qr_codes/${currentId}/vehicle`);
+
+      // Listen for changes
+      onValue(vehicleRef, (snapshot) => {
+        const info = snapshot.val();
+        if (info && info.make && info.model && info.year && info.plate) {
+          showSummary(info);
+          setLoading("");
+        } else {
+          showForm();
+          setLoading("");
+        }
+      }, (error) => {
+        setLoading("Error loading vehicle data.");
+      });
+    }
+
+    // Save vehicle handler
+    vehicleInfoForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const info = {
+        make: makeInput.value.trim(),
+        model: modelInput.value.trim(),
+        year: yearInput.value.trim(),
+        plate: plateInput.value.trim()
+      };
+      if (!info.make || !info.model || !info.year || !info.plate) {
+        setLoading("Please fill out all fields.");
+        return;
+      }
+      setLoading("Saving...");
+      try {
+        await set(vehicleRef, info);
+        showSummary(info);
+        setLoading("");
+      } catch (err) {
+        setLoading("Error saving vehicle info.");
+      }
     });
+
+    // Edit handler
+    editVehicleBtn.addEventListener("click", async () => {
+      try {
+        const snapshot = await get(vehicleRef);
+        showForm(snapshot.val());
+        setLoading("");
+      } catch (err) {
+        setLoading("Error loading vehicle info.");
+      }
+    });
+
+    // Cancel handler
+    cancelEditVehicleBtn.addEventListener("click", async () => {
+      try {
+        const snapshot = await get(vehicleRef);
+        showSummary(snapshot.val());
+        setLoading("");
+      } catch (err) {
+        setLoading("Error loading vehicle info.");
+      }
+    });
+
+    main();
   </script>
 </body>
 </html>
