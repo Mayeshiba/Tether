@@ -2,28 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Log Entry Page</title>
+  <title>Generic Log</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div class="max-w-2xl mx-auto mt-12 p-6 bg-white rounded-lg shadow-md">
+  <div class="max-w-xl mx-auto mt-10 bg-white p-6 rounded-lg shadow">
     <h1 class="text-2xl font-bold mb-4 text-center">Log Entry</h1>
-    <form id="log-form" class="space-y-4"></form>
-    <div class="mt-6 text-center">
-      <button id="save-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Save Entry</button>
+    <form id="entry-form" class="space-y-4"></form>
+    <div class="text-center">
+      <button id="submit-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-2">Save Entry</button>
+      <p class="mt-4 text-red-600 text-sm cursor-pointer underline" id="reset-btn">Reset This Log</p>
     </div>
-    <!-- ✅ This is the reset button section -->
-    <div class="mt-4 text-center">
-      <button id="reset-btn" class="text-sm text-red-600 underline">Reset This Log</button>
-    </div>
-    <hr class="my-8" />
-    <div id="log-entries" class="space-y-4"></div>
+    <hr class="my-6" />
+    <h2 class="text-lg font-semibold mb-2">Previous Entries</h2>
+    <div id="entries" class="space-y-2"></div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getDatabase, ref, get, push, set, remove, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
@@ -41,97 +39,74 @@
 
     const id = new URLSearchParams(window.location.search).get("id");
     if (!id) {
-      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Error: No ID found in URL.</div>";
-      throw new Error("No ID in URL");
+      alert("No ID provided in URL");
+      throw new Error("Missing ID");
     }
 
-    // Load assigned template
-    const templateRef = ref(db, `qr_codes/${id}/template`);
-    const templateSnap = await get(templateRef);
-    const templateKey = templateSnap.val();
+    const qrRef = ref(db, `qr_codes/${id}`);
+    const entryRef = ref(db, `logs/${id}`);
+    const form = document.getElementById("entry-form");
+    const entriesDiv = document.getElementById("entries");
 
-    if (!templateKey) {
-      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Error: No template assigned for this log.</div>";
-      throw new Error("No template found");
+    let currentFields = [];
+
+    async function loadTemplateAndRenderForm() {
+      const qrSnap = await get(qrRef);
+      const qrData = qrSnap.val();
+      if (!qrData?.template) {
+        alert("No template set for this ID");
+        return;
+      }
+
+      const templateSnap = await get(ref(db, `templates/${qrData.template}`));
+      const template = templateSnap.val();
+
+      if (!template?.fields) {
+        alert("No fields found in template");
+        return;
+      }
+
+      form.innerHTML = "";
+      currentFields = template.fields;
+
+      template.fields.forEach((fieldLabel, i) => {
+        const inputId = `field-${i}`;
+        const fieldDiv = document.createElement("div");
+        fieldDiv.innerHTML = `
+          <label for="${inputId}" class="block font-medium">${fieldLabel}</label>
+          <input type="text" id="${inputId}" class="w-full border rounded px-3 py-2 mt-1" />
+        `;
+        form.appendChild(fieldDiv);
+      });
     }
 
-    // Load template fields
-    const templateDefRef = ref(db, `templates/${templateKey}`);
-    const defSnap = await get(templateDefRef);
-    const template = defSnap.val();
-
-    if (!template || !template.fields) {
-      document.body.innerHTML = "<div class='text-center text-red-600 font-bold mt-12'>Error: Template data missing or invalid.</div>";
-      throw new Error("No template data found");
-    }
-
-    // Render form
-    const form = document.getElementById("log-form");
-    template.fields.forEach((field, i) => {
-      const inputId = `field-${i}`;
-      const label = field.label || `Field ${i + 1}`;
-      const type = field.type || "text";
-
-      form.innerHTML += `
-        <div>
-          <label for="${inputId}" class="block font-semibold mb-1">${label}</label>
-          <input id="${inputId}" type="${type}" class="w-full border rounded px-3 py-2" />
-        </div>
-      `;
+    document.getElementById("submit-btn").addEventListener("click", async (e) => {
+      e.preventDefault();
+      const entry = {};
+      currentFields.forEach((_, i) => {
+        entry[`field${i + 1}`] = document.getElementById(`field-${i}`).value;
+      });
+      await push(entryRef, entry);
+      form.reset();
     });
 
-    // Save entry
-    document.getElementById("save-btn").onclick = async () => {
-      const values = {};
-      template.fields.forEach((field, i) => {
-        const inputId = `field-${i}`;
-        values[field.label || `Field ${i + 1}`] = document.getElementById(inputId).value;
-      });
+    onValue(entryRef, (snapshot) => {
+      const entries = snapshot.val() || {};
+      entriesDiv.innerHTML = Object.values(entries).map((entry) =>
+        `<div class="bg-gray-200 p-3 rounded">
+          ${Object.values(entry).map((val) => `<div>${val}</div>`).join("")}
+        </div>`).join("");
+    });
 
-      const entryRef = ref(db, `logs/${id}`);
-      await push(entryRef, {
-        timestamp: new Date().toISOString(),
-        values
-      });
+    document.getElementById("reset-btn").addEventListener("click", async () => {
+      if (confirm("Are you sure you want to reset this log? All data will be lost.")) {
+        await remove(entryRef);
+        await remove(qrRef);
+        window.location.href = "index.html";
+      }
+    });
 
-      loadEntries();
-    };
-
-    // Load previous entries
-    async function loadEntries() {
-      const entriesRef = ref(db, `logs/${id}`);
-      const snap = await get(entriesRef);
-      const entries = snap.val() || {};
-
-      const container = document.getElementById("log-entries");
-      container.innerHTML = "<h2 class='text-lg font-semibold mb-2'>Previous Entries</h2>";
-
-      Object.values(entries).reverse().forEach(entry => {
-        const time = new Date(entry.timestamp).toLocaleString();
-        const items = Object.entries(entry.values)
-          .map(([k, v]) => `<div><strong>${k}:</strong> ${v}</div>`)
-          .join("");
-        container.innerHTML += `
-          <div class="p-4 border rounded">
-            <div class="text-sm text-gray-500 mb-2">${time}</div>
-            ${items}
-          </div>
-        `;
-      });
-    }
-
-    loadEntries();
-
-    // ✅ Reset button logic
-    document.getElementById("reset-btn").onclick = async () => {
-      const confirmed = confirm("Are you sure you want to reset this log? All entries and template settings will be permanently deleted.");
-      if (!confirmed) return;
-
-      await set(ref(db, `qr_codes/${id}`), null); // Remove template
-      await set(ref(db, `logs/${id}`), null);     // Remove entries
-
-      window.location.href = `index.html?id=${encodeURIComponent(id)}`;
-    };
+    loadTemplateAndRenderForm();
   </script>
 </body>
 </html>
