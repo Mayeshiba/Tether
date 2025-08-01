@@ -49,8 +49,8 @@
       const snap = await get(qrRef);
       const data = snap.val();
       if (data && data.template) {
-        // Template chosen already → redirect
-        window.location.href = `/Tether/generic_log.html?id=${encodeURIComponent(id)}`;
+        // Redirect to generic_log.html (relative path, no slash)
+        window.location.href = `generic_log.html?id=${encodeURIComponent(id)}`;
         return;
       }
 
@@ -81,7 +81,7 @@
         const selected = document.getElementById("template-select").value;
         if (!selected) return;
         await set(qrRef, { template: selected });
-        window.location.href = `/Tether/generic_log.html?id=${encodeURIComponent(id)}`;
+        window.location.href = `generic_log.html?id=${encodeURIComponent(id)}`;
       };
     }
 
