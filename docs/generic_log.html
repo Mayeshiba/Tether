@@ -61,6 +61,8 @@
         return;
       }
 
+      form.innerHTML = ""; // Clear form before loading fields
+
       template.fields.forEach((field, idx) => {
         const wrapper = document.createElement("div");
         wrapper.className = "field-block";
