@@ -63,7 +63,7 @@
 
     // Function to load and display public item data
     async function loadPublicItemData(qrId) {
-      publicDataStatus.textContent = "Loading item details...";
+      publicDataStatus.textContent = "Loading item details..."; // Initial loading message
       try {
         const publicRef = ref(db, `public_items_data/${qrId}`);
         const snap = await get(publicRef);
@@ -88,7 +88,8 @@
           }
           publicItemDataDiv.innerHTML = content;
         } else {
-          publicItemDataDiv.innerHTML = `<p class="text-center text-gray-500">No public details found for this item.</p>`;
+          // Clear content if no public data, instead of "No public details found" message
+          publicItemDataDiv.innerHTML = ''; 
         }
       } catch (error) {
         console.error("Error loading public item data:", error);
@@ -164,8 +165,11 @@
         const snap = await get(qrRef);
         const qrData = snap.val();
         
+        // MODIFIED: Redirect to index.html if no template is configured for this QR ID
         if (!qrData || !qrData.template) {
-          throw new Error("Template not configured for this QR code. Please go back and select a template.");
+          console.warn(`QR ID ${currentQrId} has no template configured. Redirecting to index.html.`);
+          window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
+          return; // Stop further execution on this page
         }
 
         currentLogScope = qrData.log_scope || 'personal'; // Default to 'personal' if not set
@@ -189,7 +193,11 @@
         const templateSnap = await get(templateRef);
         const template = templateSnap.val();
         if (!template || !template.fields) {
-          throw new Error("Invalid template format found in Firebase.");
+          // This error should ideally not be hit if qrData.template exists and is valid,
+          // but keeping it for robustness if a template is deleted or corrupted.
+          console.warn(`Template '${qrData.template}' not found or invalid. Redirecting to index.html.`);
+          window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
+          return;
         }
 
         form.innerHTML = "";
@@ -240,7 +248,7 @@
 
       } catch (err) {
         console.error("An error occurred during template or public data loading:", err);
-        form.innerHTML = `<p class="text-red-600 font-bold">${err.message}</p>`;
+        form.innerHTML = `<p class="text-red-600 font-bold">An error occurred: ${err.message}</p>`;
         submitBtn.disabled = true;
       }
 
