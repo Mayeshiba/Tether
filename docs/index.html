@@ -2,27 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>QR Log Template Selection</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div class="max-w-lg mx-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
   <title>QR Log System</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
   <div class="max-w-lg mx-auto mt-24 bg-white p-8 rounded-lg shadow-lg">
+    <!-- MODIFIED: Removed QR ID from title for setup mode -->
     <h1 class="text-2xl font-bold mb-6 text-center" id="page-title">Loading QR Code...</h1>
     <div id="user-status" class="text-center text-sm mb-4 text-gray-600 hidden"></div>
     <div id="app">
       <p class="text-center text-gray-500">Please wait, determining log type...</p>
     </div>
   </div>
+
+  <!-- MODIFIED: Moved Admin Page link outside the main app div to prevent duplication -->
+  <div class="max-w-lg mx-auto mt-8 text-center">
+    <a href="./admin.html" class="text-blue-500 hover:underline">Go to Admin Page</a>
+  </div>
+</body>
+</html>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -66,7 +65,8 @@
 
     // Function to display template selection UI for admin
     async function showTemplateSelectionUI(qrId) {
-      pageTitle.textContent = `Setup Log for QR: ${qrId}`;
+      // MODIFIED: Changed title to be generic for setup, not showing QR ID
+      pageTitle.textContent = `Configure New QR Code`; 
       userStatusDiv.classList.add("hidden"); // Hide user status during setup
 
       const templatesSnap = await get(ref(db, "templates"));
@@ -91,11 +91,11 @@
           <div class="flex justify-center space-x-4">
             <label class="inline-flex items-center">
               <input type="radio" name="log-scope" value="personal" class="form-radio text-blue-600" checked>
-              <span class="ml-2">Personal Log (requires user account)</span>
+              <span class="ml-2">Aura Code (Personal Log)</span>
             </label>
             <label class="inline-flex items-center">
               <input type="radio" name="log-scope" value="shared" class="form-radio text-blue-600">
-              <span class="ml-2">Shared Log (no account needed)</span>
+              <span class="ml-2">Terra Code (Shared Log)</span>
             </label>
           </div>
         </div>
@@ -138,132 +138,48 @@
       const qrConfig = qrConfigSnap.val();
 
       if (qrConfig && qrConfig.template && qrConfig.log_scope) {
-        // QR code is already configured, proceed with routing
-        pageTitle.textContent = `Loading Log for ${currentQrId}...`;
-        if (qrConfig.log_scope === 'personal') {
+        // QR code is already configured, proceed with routing based on log_scope
+        pageTitle.textContent = `Loading Log...`; // MODIFIED: Generic loading title
+        if (qrConfig.log_scope === 'personal') { // Aura
           userStatusDiv.classList.remove("hidden"); // Show user status for personal logs
-          // For personal logs, ensure user is authenticated
-          onAuthStateChanged(auth, (user) => {
-            if (user) {
-              currentUserId = user.uid;
-              userStatusDiv.textContent = `Logged in as: ${currentUserId}`;
-              redirectToLogPage(currentQrId, currentUserId);
-            } else {
-              userStatusDiv.textContent = "Signing in anonymously...";
-              signInAnonymously(auth)
-                .then(() => { /* onAuthStateChanged will handle redirection */ })
-                .catch((error) => {
-                  console.error("Anonymous sign-in failed:", error);
-                  userStatusDiv.textContent = `Authentication Error: ${error.message}`;
-                  appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Failed to authenticate for personal log.</div>`;
-                });
+          
+          // Ensure user is authenticated before redirecting for personal logs
+          if (!auth.currentUser) {
+            userStatusDiv.textContent = "Signing in anonymously...";
+            try {
+              await signInAnonymously(auth);
+              // After successful sign-in, auth.currentUser will be set
+            } catch (error) {
+              console.error("Anonymous sign-in failed during routing:", error);
+              userStatusDiv.textContent = `Authentication Error: ${error.message}`;
+              appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Failed to authenticate for personal log.</div>`;
+              return; // Stop execution if authentication fails
             }
-          });
-        } else if (qrConfig.log_scope === 'shared') {
+          }
+          currentUserId = auth.currentUser.uid; // Now we are sure currentUserId is available
+          userStatusDiv.textContent = `Logged in as: ${currentUserId}`;
+          redirectToLogPage(currentQrId, currentUserId);
+        } else if (qrConfig.log_scope === 'shared') { // Terra
           userStatusDiv.classList.add("hidden"); // Hide user status for shared logs
           // For shared logs, no authentication needed, redirect directly
           redirectToLogPage(currentQrId);
         } else {
-          // Fallback for unknown log_scope
+          // Fallback for unknown log_scope (shouldn't happen if admin sets it correctly)
           pageTitle.textContent = "Error";
           appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: Unknown log scope configured for this QR code.</div>`;
         }
       } else {
-        // QR code is not yet configured, show admin setup UI
-        showTemplateSelectionUI(currentQrId);
+        // If QR code is NOT configured (no entry in qr_codes/{id} or incomplete),
+        // automatically default to 'shared' (Terra) behavior.
+        pageTitle.textContent = `Loading Shared Log...`; // MODIFIED: Generic loading title
+        userStatusDiv.classList.add("hidden"); // Hide user status for shared logs
+        redirectToLogPage(currentQrId); // Redirect directly, no userId
       }
     }
 
     // Initial call to start the routing process
-    routeQrCode();
+    // We call routeQrCode inside onAuthStateChanged to ensure Firebase Auth is initialized
+    onAuthStateChanged(auth, (user) => {
+      routeQrCode(); // Call routeQrCode once auth state is known
+    });
   </script>
-
-  <!-- Link to Admin Page -->
-  <div class="max-w-lg mx-auto mt-8 text-center">
-    <a href="./admin.html" class="text-blue-500 hover:underline">Go to Admin Page</a>
-  </div>
-</body>
-</html>
-auto mt-24 bg-white p-8 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-bold mb-6 text-center">Log Template Selection</h1>
-    <div id="app"></div>
-  </div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "277809008742",
-      appId: "1:277809008742:web:2586a2b821d8da8f969da7"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const appDiv = document.getElementById("app");
-
-    function getIdFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("id") || "";
-    }
-
-    async function main() {
-      const id = getIdFromURL();
-      if (!id) {
-        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: No ID found in URL.</div>`;
-        return;
-      }
-
-      // Check if template is already set
-      const qrRef = ref(db, `qr_codes/${id}`);
-      const snap = await get(qrRef);
-      const data = snap.val();
-
-      if (data && data.template) {
-        window.location.href = `./generic_log.html?id=${encodeURIComponent(id)}`;
-        return;
-      }
-
-      // Load available templates
-      const templatesSnap = await get(ref(db, "templates"));
-      const templates = templatesSnap.val();
-      if (!templates) {
-        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">No templates found in Firebase.</div>`;
-        return;
-      }
-
-      const options = Object.entries(templates)
-        .map(([key, val]) => `<option value="${key}">${val.label || key}</option>`)
-        .join("");
-
-      appDiv.innerHTML = `
-        <div class="mb-6 text-center">
-          <label for="template-select" class="block font-semibold mb-2">Select a log template:</label>
-          <select id="template-select" class="p-2 border rounded mb-4 w-full">${options}</select>
-          <button id="choose-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded w-full">Confirm Template</button>
-        </div>
-      `;
-
-      document.getElementById("choose-btn").onclick = async () => {
-        const selected = document.getElementById("template-select").value;
-        if (!selected) return;
-        await set(qrRef, { template: selected });
-        window.location.href = `./generic_log.html?id=${encodeURIComponent(id)}`;
-      };
-    }
-
-    main();
-  </script>
-
-  <!-- New: Link to Admin Page -->
-  <div class="max-w-lg mx-auto mt-8 text-center">
-    <a href="./admin.html" class="text-blue-500 hover:underline">Go to Admin Page</a>
-  </div>
-</body>
-</html>
-
