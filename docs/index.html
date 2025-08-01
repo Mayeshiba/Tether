@@ -2,20 +2,53 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>QR Log Template Selection</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Manage Templates</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div class="max-w-lg mx-auto mt-24 bg-white p-8 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-bold mb-6 text-center">Log Template Selection</h1>
-    <div id="app"></div>
+<body class="bg-gray-100 text-gray-800 min-h-screen p-4">
+  <div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold mb-8 text-center text-blue-700">Admin Panel - Manage Log Templates</h1>
+
+    <!-- Section for Creating New Templates -->
+    <div class="mb-10 p-6 border border-blue-200 rounded-lg bg-blue-50">
+      <h2 class="text-2xl font-semibold mb-6 text-blue-600">Create New Template</h2>
+      <form id="new-template-form" class="space-y-4">
+        <div>
+          <label for="template-label" class="block text-lg font-medium text-gray-700">Display Label (e.g., Car Maintenance Log):</label>
+          <input type="text" id="template-label" required class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="User-friendly name for the template">
+          <!-- Auto-generated key will be derived from this label -->
+        </div>
+
+        <h3 class="text-xl font-medium mt-6 mb-4 text-gray-700">Template Fields:</h3>
+        <div id="template-fields-container" class="space-y-4 border p-4 rounded-md bg-white">
+          <!-- Dynamic fields will be added here -->
+        </div>
+        <button type="button" id="add-field-btn" class="mt-4 px-6 py-3 bg-green-500 text-white font-semibold rounded-md shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+          Add New Field
+        </button>
+
+        <button type="submit" class="mt-8 w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+          Save New Template
+        </button>
+        <p id="new-template-status" class="mt-4 text-center text-sm text-gray-600"></p>
+      </form>
+    </div>
+
+    <!-- Section for Managing Existing Templates -->
+    <div class="p-6 border border-gray-200 rounded-lg bg-gray-50">
+      <h2 class="text-2xl font-semibold mb-6 text-gray-700">Existing Templates</h2>
+      <div id="existing-templates-list" class="space-y-4">
+        <p class="text-center text-gray-500">Loading templates...</p>
+      </div>
+    </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getDatabase, ref, get, set, remove, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
+    // Firebase configuration (replace with your actual config if different)
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
@@ -26,66 +59,204 @@
       appId: "1:277809008742:web:2586a2b821d8da8f969da7"
     };
 
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const appDiv = document.getElementById("app");
+    const templatesRef = ref(db, "templates");
 
-    function getIdFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("id") || "";
-    }
+    // Get DOM elements
+    const newTemplateForm = document.getElementById("new-template-form");
+    const templateLabelInput = document.getElementById("template-label"); // No more template-name input
+    const templateFieldsContainer = document.getElementById("template-fields-container");
+    const addFieldBtn = document.getElementById("add-field-btn");
+    const newTemplateStatus = document.getElementById("new-template-status");
+    const existingTemplatesList = document.getElementById("existing-templates-list");
 
-    async function main() {
-      const id = getIdFromURL();
-      if (!id) {
-        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: No ID found in URL.</div>`;
-        return;
-      }
+    let fieldCounter = 0; // To keep track of unique field IDs
 
-      // Check if template is already set
-      const qrRef = ref(db, `qr_codes/${id}`);
-      const snap = await get(qrRef);
-      const data = snap.val();
-
-      if (data && data.template) {
-        window.location.href = `./generic_log.html?id=${encodeURIComponent(id)}`;
-        return;
-      }
-
-      // Load available templates
-      const templatesSnap = await get(ref(db, "templates"));
-      const templates = templatesSnap.val();
-      if (!templates) {
-        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">No templates found in Firebase.</div>`;
-        return;
-      }
-
-      const options = Object.entries(templates)
-        .map(([key, val]) => `<option value="${key}">${val.label || key}</option>`)
-        .join("");
-
-      appDiv.innerHTML = `
-        <div class="mb-6 text-center">
-          <label for="template-select" class="block font-semibold mb-2">Select a log template:</label>
-          <select id="template-select" class="p-2 border rounded mb-4 w-full">${options}</select>
-          <button id="choose-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded w-full">Confirm Template</button>
+    // Function to add a new field input group to the form
+    function addNewField() {
+      const fieldId = `field-${fieldCounter++}`;
+      const fieldDiv = document.createElement("div");
+      fieldDiv.className = "field-group p-3 border border-gray-200 rounded-md bg-gray-50 relative";
+      fieldDiv.innerHTML = `
+        <button type="button" class="remove-field-btn absolute top-2 right-2 text-red-500 hover:text-red-700 text-xl font-bold">&times;</button>
+        <div class="mb-2">
+          <label for="${fieldId}-name" class="block text-sm font-medium text-gray-700">Field Name:</label>
+          <input type="text" id="${fieldId}-name" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" placeholder="e.g., odometer">
+        </div>
+        <div class="mb-2">
+          <label for="${fieldId}-type" class="block text-sm font-medium text-gray-700">Field Type:</label>
+          <select id="${fieldId}-type" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm sm:text-sm">
+            <option value="text">Text</option>
+            <option value="number">Number (e.g., Currency, Quantity)</option>
+            <option value="date">Date</option>
+            <option value="multichoice">Multiple Choice</option>
+          </select>
+        </div>
+        <div id="${fieldId}-options-container" class="hidden mt-2 p-2 border border-gray-200 rounded-md bg-white">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Multiple Choice Options (comma-separated):</label>
+          <input type="text" id="${fieldId}-options" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" placeholder="Option1, Option2, Option3">
         </div>
       `;
+      templateFieldsContainer.appendChild(fieldDiv);
 
-      document.getElementById("choose-btn").onclick = async () => {
-        const selected = document.getElementById("template-select").value;
-        if (!selected) return;
-        await set(qrRef, { template: selected });
-        window.location.href = `./generic_log.html?id=${encodeURIComponent(id)}`;
-      };
+      // Add event listener for type change to show/hide options
+      const fieldTypeSelect = fieldDiv.querySelector(`#${fieldId}-type`);
+      const optionsContainer = fieldDiv.querySelector(`#${fieldId}-options-container`);
+      fieldTypeSelect.addEventListener("change", (event) => {
+        if (event.target.value === "multichoice") {
+          optionsContainer.classList.remove("hidden");
+        } else {
+          optionsContainer.classList.add("hidden");
+        }
+      });
+
+      // Add event listener for remove button
+      fieldDiv.querySelector(".remove-field-btn").addEventListener("click", () => {
+        fieldDiv.remove();
+      });
+    }
+
+    // Function to render existing templates
+    async function renderExistingTemplates(templates) {
+      existingTemplatesList.innerHTML = "";
+      if (!templates) {
+        existingTemplatesList.innerHTML = `<p class="text-center text-gray-500">No templates found.</p>`;
+        return;
+      }
+
+      Object.entries(templates).forEach(([key, template]) => {
+        const templateDiv = document.createElement("div");
+        templateDiv.className = "p-4 border border-gray-200 rounded-md bg-white shadow-sm flex justify-between items-center";
+        templateDiv.innerHTML = `
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">${template.label || key}</h3>
+            <p class="text-sm text-gray-500">Key: ${key}</p>
+          </div>
+          <button data-template-key="${key}" class="delete-template-btn px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+            Delete
+          </button>
+        `;
+        existingTemplatesList.appendChild(templateDiv);
+      });
+
+      // Add event listeners for delete buttons
+      existingTemplatesList.querySelectorAll(".delete-template-btn").forEach(button => {
+        button.addEventListener("click", async (event) => {
+          const templateKey = event.target.dataset.templateKey;
+          if (confirm(`Are you sure you want to delete the template "${templateKey}"? This action cannot be undone.`)) {
+            try {
+              await remove(ref(db, `templates/${templateKey}`));
+              // onValue listener will automatically re-render the list
+              console.log(`Template "${templateKey}" deleted successfully.`);
+            } catch (error) {
+              console.error("Error deleting template:", error);
+              alert("Failed to delete template: " + error.message);
+            }
+          }
+        });
+      });
+    }
+
+    // Main function to initialize and handle events
+    async function main() {
+      // Initial field for new template form
+      addNewField();
+
+      // Event listener for "Add New Field" button
+      addFieldBtn.addEventListener("click", addNewField);
+
+      // Event listener for new template form submission
+      newTemplateForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        newTemplateStatus.textContent = "Saving template...";
+        newTemplateStatus.className = "mt-4 text-center text-sm text-gray-600";
+
+        const templateLabel = templateLabelInput.value.trim();
+        // Auto-generate template key from display label
+        const templateName = templateLabel.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+        if (!templateLabel) {
+          newTemplateStatus.textContent = "Error: Display Label is required.";
+          newTemplateStatus.className = "mt-4 text-center text-sm text-red-600 font-bold";
+          return;
+        }
+        if (!templateName) { // Fallback if label results in empty key
+          newTemplateStatus.textContent = "Error: Could not generate a valid template key from the display label. Please use alphanumeric characters.";
+          newTemplateStatus.className = "mt-4 text-center text-sm text-red-600 font-bold";
+          return;
+        }
+
+
+        const fields = {};
+        const fieldGroups = templateFieldsContainer.querySelectorAll(".field-group");
+        
+        fieldGroups.forEach((group, index) => {
+          const fieldName = group.querySelector("input[type='text']").value.trim();
+          const fieldType = group.querySelector("select").value;
+          
+          if (fieldName) {
+            const field = { name: fieldName, type: fieldType };
+            if (fieldType === "multichoice") {
+              const optionsInput = group.querySelector("input[id$='-options']");
+              if (optionsInput && optionsInput.value.trim()) {
+                field.options = optionsInput.value.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
+              } else {
+                console.warn(`Multiple Choice field '${fieldName}' has no options. Treating as text.`);
+                field.type = "text"; // Fallback to text if no options
+                delete field.options;
+              }
+            }
+            fields[index] = field; // Use index as key to match Firebase structure
+          }
+        });
+
+        if (Object.keys(fields).length === 0) {
+          newTemplateStatus.textContent = "Error: At least one field is required for the template.";
+          newTemplateStatus.className = "mt-4 text-center text-sm text-red-600 font-bold";
+          return;
+        }
+
+        const newTemplateData = {
+          label: templateLabel,
+          fields: fields
+        };
+
+        try {
+          // Check if template name already exists
+          const existingTemplateSnap = await get(ref(db, `templates/${templateName}`));
+          if (existingTemplateSnap.exists()) {
+            newTemplateStatus.textContent = `Error: Template with key "${templateName}" already exists. Please choose a different Display Label.`;
+            newTemplateStatus.className = "mt-4 text-center text-sm text-red-600 font-bold";
+            return;
+          }
+
+          await set(ref(db, `templates/${templateName}`), newTemplateData);
+          newTemplateStatus.textContent = `Template "${templateLabel}" (Key: "${templateName}") saved successfully!`;
+          newTemplateStatus.className = "mt-4 text-center text-sm text-green-600 font-bold";
+          newTemplateForm.reset(); // Clear form
+          templateFieldsContainer.innerHTML = ''; // Clear fields
+          fieldCounter = 0; // Reset counter
+          addNewField(); // Add one empty field for convenience
+        } catch (error) {
+          console.error("Error saving template:", error);
+          newTemplateStatus.textContent = `Error saving template: ${error.message}`;
+          newTemplateStatus.className = "mt-4 text-center text-sm text-red-600 font-bold";
+        }
+      });
+
+      // Listen for real-time updates to templates and re-render the list
+      onValue(templatesRef, (snapshot) => {
+        const templates = snapshot.val();
+        renderExistingTemplates(templates);
+      }, (error) => {
+        console.error("Error fetching existing templates:", error);
+        existingTemplatesList.innerHTML = `<p class="text-center text-red-600">Error loading templates: ${error.message}</p>`;
+      });
     }
 
     main();
   </script>
-
-  <!-- New: Link to Admin Page -->
-  <div class="max-w-lg mx-auto mt-8 text-center">
-    <a href="./admin.html" class="text-blue-500 hover:underline">Go to Admin Page</a>
-  </div>
 </body>
 </html>
