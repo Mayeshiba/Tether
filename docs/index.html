@@ -7,7 +7,184 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
+  <div class="max-w-lg mx-<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QR Log System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
   <div class="max-w-lg mx-auto mt-24 bg-white p-8 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold mb-6 text-center" id="page-title">Loading QR Code...</h1>
+    <div id="user-status" class="text-center text-sm mb-4 text-gray-600 hidden"></div>
+    <div id="app">
+      <p class="text-center text-gray-500">Please wait, determining log type...</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    const appDiv = document.getElementById("app");
+    const userStatusDiv = document.getElementById("user-status");
+    const pageTitle = document.getElementById("page-title");
+
+    let currentQrId = null;
+    let currentUserId = null; // Will be null for shared logs, or actual UID for personal logs
+
+    // Function to get QR ID from URL
+    function getQrIdFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id") || "";
+    }
+
+    // Function to redirect to generic_log.html
+    function redirectToLogPage(qrId, userId = null) {
+      let url = `./generic_log.html?id=${encodeURIComponent(qrId)}`;
+      if (userId) {
+        url += `&userId=${encodeURIComponent(userId)}`;
+      }
+      window.location.href = url;
+    }
+
+    // Function to display template selection UI for admin
+    async function showTemplateSelectionUI(qrId) {
+      pageTitle.textContent = `Setup Log for QR: ${qrId}`;
+      userStatusDiv.classList.add("hidden"); // Hide user status during setup
+
+      const templatesSnap = await get(ref(db, "templates"));
+      const templates = templatesSnap.val();
+
+      if (!templates) {
+        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">No templates found in Firebase. Please create some in the Admin Page.</div>`;
+        return;
+      }
+
+      const options = Object.entries(templates)
+        .map(([key, val]) => `<option value="${key}">${val.label || key}</option>`)
+        .join("");
+
+      appDiv.innerHTML = `
+        <div class="mb-6 text-center">
+          <label for="template-select" class="block font-semibold mb-2">Select a log template:</label>
+          <select id="template-select" class="p-2 border rounded mb-4 w-full">${options}</select>
+        </div>
+        <div class="mb-6 text-center">
+          <label class="block font-semibold mb-2">Choose Log Type:</label>
+          <div class="flex justify-center space-x-4">
+            <label class="inline-flex items-center">
+              <input type="radio" name="log-scope" value="personal" class="form-radio text-blue-600" checked>
+              <span class="ml-2">Personal Log (requires user account)</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input type="radio" name="log-scope" value="shared" class="form-radio text-blue-600">
+              <span class="ml-2">Shared Log (no account needed)</span>
+            </label>
+          </div>
+        </div>
+        <button id="choose-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded w-full">Confirm Template & Log Type</button>
+      `;
+
+      document.getElementById("choose-btn").onclick = async () => {
+        const selectedTemplate = document.getElementById("template-select").value;
+        const selectedScope = document.querySelector('input[name="log-scope"]:checked').value;
+
+        if (!selectedTemplate) {
+          alert("Please select a template.");
+          return;
+        }
+
+        // Save template and log_scope for this QR code (public association)
+        await set(ref(db, `qr_codes/${qrId}`), { 
+          template: selectedTemplate,
+          log_scope: selectedScope
+        });
+        
+        // Now that scope is set, re-run the main routing logic
+        routeQrCode();
+      };
+    }
+
+    // Main routing logic
+    async function routeQrCode() {
+      currentQrId = getQrIdFromURL();
+
+      if (!currentQrId) {
+        pageTitle.textContent = "Error";
+        appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: No QR ID found in URL. Scan a QR code or provide '?id=...'</div>`;
+        return;
+      }
+
+      // Try to fetch existing QR code configuration
+      const qrConfigRef = ref(db, `qr_codes/${currentQrId}`);
+      const qrConfigSnap = await get(qrConfigRef);
+      const qrConfig = qrConfigSnap.val();
+
+      if (qrConfig && qrConfig.template && qrConfig.log_scope) {
+        // QR code is already configured, proceed with routing
+        pageTitle.textContent = `Loading Log for ${currentQrId}...`;
+        if (qrConfig.log_scope === 'personal') {
+          userStatusDiv.classList.remove("hidden"); // Show user status for personal logs
+          // For personal logs, ensure user is authenticated
+          onAuthStateChanged(auth, (user) => {
+            if (user) {
+              currentUserId = user.uid;
+              userStatusDiv.textContent = `Logged in as: ${currentUserId}`;
+              redirectToLogPage(currentQrId, currentUserId);
+            } else {
+              userStatusDiv.textContent = "Signing in anonymously...";
+              signInAnonymously(auth)
+                .then(() => { /* onAuthStateChanged will handle redirection */ })
+                .catch((error) => {
+                  console.error("Anonymous sign-in failed:", error);
+                  userStatusDiv.textContent = `Authentication Error: ${error.message}`;
+                  appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Failed to authenticate for personal log.</div>`;
+                });
+            }
+          });
+        } else if (qrConfig.log_scope === 'shared') {
+          userStatusDiv.classList.add("hidden"); // Hide user status for shared logs
+          // For shared logs, no authentication needed, redirect directly
+          redirectToLogPage(currentQrId);
+        } else {
+          // Fallback for unknown log_scope
+          pageTitle.textContent = "Error";
+          appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: Unknown log scope configured for this QR code.</div>`;
+        }
+      } else {
+        // QR code is not yet configured, show admin setup UI
+        showTemplateSelectionUI(currentQrId);
+      }
+    }
+
+    // Initial call to start the routing process
+    routeQrCode();
+  </script>
+
+  <!-- Link to Admin Page -->
+  <div class="max-w-lg mx-auto mt-8 text-center">
+    <a href="./admin.html" class="text-blue-500 hover:underline">Go to Admin Page</a>
+  </div>
+</body>
+</html>
+auto mt-24 bg-white p-8 rounded-lg shadow-lg">
     <h1 class="text-2xl font-bold mb-6 text-center">Log Template Selection</h1>
     <div id="app"></div>
   </div>
