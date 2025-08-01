@@ -13,6 +13,11 @@
     <button id="submit" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Submit</button>
     <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Template</button>
     <p id="status" class="mt-4 text-center text-sm text-gray-600"></p>
+
+        <div id="log-history" class="mt-8 border-t pt-4">
+      <h2 class="text-xl font-bold mb-4 text-center">Log History</h2>
+      <div id="log-list" class="space-y-4"></div>
+    </div>
   </div>
 
   <script type="module">
@@ -36,6 +41,41 @@
     const submitBtn = document.getElementById("submit");
     const resetBtn = document.getElementById("reset");
     const status = document.getElementById("status");
+    const logList = document.getElementById("log-list");
+
+    async function renderLogs(id) {
+      console.log("Rendering logs for ID:", id);
+      logList.innerHTML = `<p class="text-center text-gray-500">Loading logs...</p>`;
+      const logsRef = ref(db, `logs/${id}`);
+      const snap = await get(logsRef);
+      const logs = snap.val();
+
+      logList.innerHTML = ""; // Clear the loading message
+
+      if (!logs) {
+        logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found.</p>`;
+        return;
+      }
+
+      // Display logs in reverse chronological order
+      const logEntries = Object.entries(logs).reverse();
+      
+      logEntries.forEach(([key, log]) => {
+        const logEntryDiv = document.createElement("div");
+        logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
+        
+        // Convert log data to a readable string
+        const logDetails = Object.entries(log)
+          .map(([field, value]) => `<strong>${field}:</strong> ${value}`)
+          .join("<br>");
+
+        logEntryDiv.innerHTML = `
+          <p class="text-sm text-gray-400 mb-2">Log ID: ${key}</p>
+          <p class="text-gray-800">${logDetails}</p>
+        `;
+        logList.appendChild(logEntryDiv);
+      });
+    }
 
     async function main() {
       const id = new URLSearchParams(window.location.search).get("id");
@@ -45,31 +85,24 @@
         submitBtn.disabled = true;
         return;
       }
-     
-      try {
-        console.log("Attempting to load template for ID:", id);
 
+      try {
+        // Load the template for the form
         const qrRef = ref(db, `qr_codes/${id}`);
         const snap = await get(qrRef);
         const data = snap.val();
         
         if (!data || !data.template) {
-          console.error("Error: Template not found in `qr_codes` for ID:", id);
           throw new Error("Template not configured for this QR code. Please go back and select a template.");
         }
-
-        console.log("Found template name:", data.template);
 
         const templateRef = ref(db, `templates/${data.template}`);
         const templateSnap = await get(templateRef);
         const template = templateSnap.val();
         if (!template || !template.fields) {
-          console.error("Error: Template data is invalid or fields are missing for template:", data.template);
           throw new Error("Invalid template format found in Firebase.");
         }
 
-        console.log("Successfully found template fields:", template.fields);
-        
         form.innerHTML = "";
 
         Object.values(template.fields).forEach((field, idx) => {
@@ -102,6 +135,10 @@
           wrapper.appendChild(input);
           form.appendChild(wrapper);
         });
+
+        // Initial call to render the log history
+        await renderLogs(id);
+
       } catch (err) {
         console.error("An error occurred during template loading:", err);
         form.innerHTML = `<p class="text-red-600 font-bold">${err.message}</p>`;
@@ -118,6 +155,8 @@
         status.innerText = "Entry saved!";
         setTimeout(() => status.innerText = "", 3000);
         form.reset();
+        // NEW: Re-render the logs after a successful submission
+        await renderLogs(id);
       });
 
       resetBtn.addEventListener("click", async () => {
