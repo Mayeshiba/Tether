@@ -66,11 +66,15 @@
         return;
       }
 
-      // EXPLICITLY extract label text from each object
       const fieldsObj = template.fields;
       currentLabels = Object.keys(fieldsObj)
         .sort()
-        .map(key => fieldsObj[key]?.label || `Field ${key}`);
+        .map((key) => {
+          const field = fieldsObj[key];
+          if (typeof field === "string") return field;
+          if (field && typeof field.label === "string") return field.label;
+          return `Unnamed Field ${key}`;
+        });
 
       form.innerHTML = "";
       currentLabels.forEach((label, i) => {
