@@ -1,5 +1,3 @@
-Generic Log
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,14 +8,23 @@ Generic Log
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
   <div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
-    <h1 class="text-2xl font-bold mb-4 text-center">Log Entry</h1>
+    <h1 class="text-2xl font-bold mb-4 text-center" id="page-title">Log Entry</h1>
+
+    <!-- Public Item Data (conditionally shown for Aura codes) -->
+    <div id="public-item-data" class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 hidden">
+      <h2 class="text-xl font-semibold mb-2 text-center">Item Details</h2>
+      <p class="text-center text-gray-500" id="public-data-status">Loading item details...</p>
+    </div>
+
+    <!-- Form and Buttons (visibility controlled by JS) -->
     <form id="log-form" class="space-y-4"></form>
     <button id="submit" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Submit</button>
-    <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Template</button>
+    <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Log</button>
     <p id="status" class="mt-4 text-center text-sm text-gray-600"></p>
 
+    <!-- Log History -->
     <div id="log-history" class="mt-8 border-t pt-4">
-      <h2 class="text-xl font-bold mb-4 text-center">Log History</h2>
+      <h2 class="text-xl font-bold mb-4 text-center" id="log-history-title">Log History</h2>
       <div id="log-list" class="space-y-4"></div>
     </div>
   </div>
@@ -39,38 +46,89 @@ Generic Log
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // Global DOM element references (these always exist in the HTML structure now)
+    const pageTitle = document.getElementById("page-title");
+    const publicItemDataDiv = document.getElementById("public-item-data");
+    const publicDataStatus = document.getElementById("public-data-status");
     const form = document.getElementById("log-form");
     const submitBtn = document.getElementById("submit");
     const resetBtn = document.getElementById("reset");
-    const status = document.getElementById("status");
+    const statusElement = document.getElementById("status");
+    const logHistoryTitle = document.getElementById("log-history-title");
     const logList = document.getElementById("log-list");
 
-    async function renderLogs(id) {
-      logList.innerHTML = `<p class="text-center text-gray-500">Loading logs...</p>`;
-      
+    let currentQrId = null;
+    let currentUserId = null; // Will be passed from index.html for Aura codes
+    let currentLogScope = null; // 'personal' or 'shared'
+    let currentLogBasePath = null; // The Firebase path for logs
+
+    // Function to load and display public item data
+    async function loadPublicItemData(qrId) {
+      publicItemDataDiv.classList.remove("hidden");
+      publicDataStatus.textContent = "Loading item details...";
       try {
-        const logsRef = ref(db, `logs/${id}`);
+        const publicRef = ref(db, `public_items_data/${qrId}`);
+        const snap = await get(publicRef);
+        const publicData = snap.val();
+
+        if (publicData) {
+          let content = `<h2 class="text-xl font-semibold mb-2 text-center">Item Details</h2>`;
+          if (publicData.image_url) {
+            content += `<img src="${publicData.image_url}" alt="Item Image" class="w-full h-48 object-cover rounded-md mb-4">`;
+          }
+          if (publicData.title) {
+            content += `<h3 class="text-lg font-semibold mb-2">${publicData.title}</h3>`;
+          }
+          if (publicData.description) {
+            content += `<p class="text-sm text-gray-700 mb-2">${publicData.description}</p>`;
+          }
+          if (publicData.tasting_notes) {
+            content += `<p class="text-sm text-gray-700 mb-2"><strong>Tasting Notes:</strong> ${publicData.tasting_notes}</p>`;
+          }
+          if (publicData.website_link) {
+            content += `<a href="${publicData.website_link}" target="_blank" class="text-blue-500 hover:underline text-sm">Visit Website</a>`;
+          }
+          publicItemDataDiv.innerHTML = content;
+        } else {
+          publicItemDataDiv.classList.add("hidden"); // Hide if no public data
+        }
+      } catch (error) {
+        console.error("Error loading public item data:", error);
+        publicItemDataDiv.innerHTML = `<p class="text-center text-red-600">Error loading item details.</p>`;
+      }
+    }
+
+    // Function to render log history using the determined currentLogBasePath
+    async function renderLogs() {
+      if (!currentLogBasePath) {
+        logList.innerHTML = `<p class="text-center text-red-600">Log path not configured.</p>`;
+        return;
+      }
+
+      logList.innerHTML = `<p class="text-center text-gray-500">Loading logs...</p>`;
+
+      try {
+        const logsRef = ref(db, currentLogBasePath);
         const snap = await get(logsRef);
         const logs = snap.val();
         logList.innerHTML = "";
 
         if (!logs) {
-          logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found.</p>`;
+          logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found for this item.</p>`;
           return;
         }
 
         const logEntries = Object.entries(logs).reverse();
-        
+
         logEntries.forEach(([key, log]) => {
           const logEntryDiv = document.createElement("div");
           logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
-          
-          // Check if a timestamp exists and is a valid number
+
           let timestampText = 'N/A';
           if (log.timestamp && !isNaN(log.timestamp)) {
             timestampText = new Date(log.timestamp).toLocaleString();
           }
-          
+
           const logDetails = Object.entries(log)
             .filter(([field, value]) => field !== 'timestamp')
             .map(([field, value]) => `<strong>${field}:</strong> ${value}`)
@@ -88,93 +146,199 @@ Generic Log
       }
     }
 
+    // Main function to initialize the page
     async function main() {
-      const id = new URLSearchParams(window.location.search).get("id");
+      const urlParams = new URLSearchParams(window.location.search);
+      currentQrId = urlParams.get("id");
+      currentUserId = urlParams.get("userId"); // Will be null for Terra codes
 
-      if (!id) {
-        form.innerHTML = '<p class="text-red-600 font-bold">Error: Missing ID in URL</p>';
-        submitBtn.disabled = true;
+      console.log("generic_log.html loaded.");
+      console.log("QR ID:", currentQrId);
+      console.log("User ID from URL:", currentUserId);
+
+      if (!currentQrId) {
+        pageTitle.textContent = "Error";
+        form.innerHTML = '<p class="text-red-600 font-bold">Error: Missing QR ID in URL</p>';
+        submitBtn.classList.add('hidden'); // Hide buttons if no ID
+        resetBtn.classList.add('hidden');
+        statusElement.classList.add('hidden');
         return;
       }
 
       try {
-        const qrRef = ref(db, `qr_codes/${id}`);
+        const qrRef = ref(db, `qr_codes/${currentQrId}`);
         const snap = await get(qrRef);
-        const data = snap.val();
-        
-        if (!data || !data.template) {
-          throw new Error("Template not configured for this QR code. Please go back and select a template.");
+        const qrData = snap.val();
+
+        if (!qrData || !qrData.template) {
+          // This scenario should ideally be prevented by index.html,
+          // which now forces template selection for unconfigured IDs.
+          // If it still happens, redirect back to index.html for configuration.
+          console.warn("QR code not configured. Redirecting to index.html for setup.");
+          window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
+          return;
         }
 
-        const templateRef = ref(db, `templates/${data.template}`);
-        const templateSnap = await get(templateRef);
-        const template = templateSnap.val();
-        if (!template || !template.fields) {
-          throw new Error("Invalid template format found in Firebase.");
-        }
+        currentLogScope = qrData.log_scope || 'shared'; // Default to shared if log_scope is missing in DB
+        console.log("Determined Log Scope:", currentLogScope);
 
-        form.innerHTML = "";
+        // Setup UI and log path based on scope
+        if (currentLogScope === 'personal') { // Aura Code
+          if (!currentUserId) {
+            console.error("User ID is missing for an Aura (personal) log. Cannot proceed.");
+            pageTitle.textContent = "Aura Log Error";
+            form.innerHTML = `
+              <p class="text-red-600 font-bold text-center">
+                Error: Your personal session could not be established. Please try scanning the QR code again from the main page.
+              </p>
+            `;
+            submitBtn.classList.add('hidden');
+            resetBtn.classList.add('hidden'); // Hide reset for now, can be enabled later for personal log reset
+            statusElement.classList.add('hidden');
+            publicItemDataDiv.classList.add('hidden'); // Ensure public data is hidden if error
+            return;
+          }
+          currentLogBasePath = `users/${currentUserId}/logs/${currentQrId}/entries`;
+          logHistoryTitle.textContent = "My Log History";
+          resetBtn.textContent = "Reset My Log";
 
-        Object.values(template.fields).forEach((field, idx) => {
-          const wrapper = document.createElement("div");
-          wrapper.className = "field-block";
+          // Render Aura (Under Construction) View
+          pageTitle.textContent = "Aura Code: Personal Log";
+          form.innerHTML = `
+            <div class="text-center py-10">
+              <h2 class="text-3xl font-bold text-purple-700 mb-4">Under Construction!</h2>
+              <p class="text-xl text-gray-700 mb-6">We're building a personalized logging experience just for you.</p>
+              <p class="text-gray-600">Check back soon for exciting updates!</p>
+            </div>
+          `;
+          submitBtn.classList.add('hidden'); // Hide submit button for Aura (under construction)
+          resetBtn.classList.remove('hidden'); // Keep reset visible for Aura to clear personal history
+          statusElement.classList.add('hidden'); // Hide status for Aura (no form submission)
 
-          const label = document.createElement("label");
-          label.innerText = field.name || `Field ${idx}`;
-          label.className = "block mb-1 font-medium";
+          await loadPublicItemData(currentQrId); // Load public data for Aura
+          await renderLogs();
 
-          let input;
-          if (field.type === "dropdown" && Array.isArray(field.options)) {
-            input = document.createElement("select");
-            input.className = "w-full p-2 border rounded";
-            field.options.forEach(opt => {
-              const option = document.createElement("option");
-              option.value = opt;
-              option.innerText = opt;
-              input.appendChild(option);
-            });
-          } else {
-            input = document.createElement("input");
-            input.type = field.type || "text";
-            input.className = "w-full p-2 border rounded";
+        } else { // Terra Code (Shared Log)
+          currentLogBasePath = `shared_logs/${currentQrId}/entries`;
+          logHistoryTitle.textContent = "Shared Log History";
+          resetBtn.textContent = "Reset Shared Log";
+
+          // Ensure form and buttons are visible for Terra
+          submitBtn.classList.remove('hidden');
+          resetBtn.classList.remove('hidden');
+          statusElement.classList.remove('hidden');
+          publicItemDataDiv.classList.add('hidden'); // Public data is not relevant for Terra in this context
+
+          // Populate form fields based on template
+          const templateRef = ref(db, `templates/${qrData.template}`);
+          const templateSnap = await get(templateRef);
+          const template = templateSnap.val();
+
+          if (!template || !template.fields) {
+            throw new Error("Invalid template format found for Terra code.");
           }
 
-          input.name = field.name;
+          form.innerHTML = ""; // Clear any previous content
 
-          wrapper.appendChild(label);
-          wrapper.appendChild(input);
-          form.appendChild(wrapper);
-        });
+          Object.values(template.fields).forEach((field, idx) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "field-block";
 
-        await renderLogs(id);
+            const label = document.createElement("label");
+            label.innerText = field.name || `Field ${idx}`;
+            label.className = "block mb-1 font-medium";
+
+            let input;
+            if (field.type === "multichoice" && Array.isArray(field.options)) {
+              input = document.createElement("select");
+              input.className = "w-full p-2 border rounded";
+              field.options.forEach(opt => {
+                const option = document.createElement("option");
+                option.value = opt;
+                option.innerText = opt;
+                input.appendChild(option);
+              });
+            } else if (field.type === "date") {
+              input = document.createElement("input");
+              input.type = "date";
+              input.className = "w-full p-2 border rounded";
+            } else if (field.type === "number") {
+              input = document.createElement("input");
+              input.type = "number";
+              input.className = "w-full p-2 border rounded";
+            } else {
+              input = document.createElement("input");
+              input.type = "text";
+              input.className = "w-full p-2 border rounded";
+            }
+
+            input.name = field.name;
+
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+            form.appendChild(wrapper);
+          });
+
+          await renderLogs();
+        }
 
       } catch (err) {
-        console.error("An error occurred during template loading:", err);
-        form.innerHTML = `<p class="text-red-600 font-bold">${err.message}</p>`;
-        submitBtn.disabled = true;
+        console.error("An error occurred during log page initialization:", err);
+        pageTitle.textContent = "Error";
+        form.innerHTML = `<p class="text-red-600 font-bold">An unexpected error occurred: ${err.message}</p>`;
+        submitBtn.classList.add('hidden');
+        resetBtn.classList.add('hidden');
+        statusElement.classList.add('hidden');
       }
 
-      submitBtn.addEventListener("click", async () => {
+      // Event Listeners (attached once after main logic determines visibility)
+      submitBtn.onclick = async () => {
         const entries = {};
         Array.from(form.elements).forEach(input => {
           if (input.name) entries[input.name] = input.value;
         });
-
         entries.timestamp = Date.now();
 
-        await push(ref(db, `logs/${id}`), entries);
-        status.innerText = "Entry saved!";
-        setTimeout(() => status.innerText = "", 3000);
-        form.reset();
-        await renderLogs(id);
-      });
+        try {
+          await push(ref(db, currentLogBasePath), entries);
+          statusElement.innerText = "Entry saved!";
+          setTimeout(() => statusElement.innerText = "", 3000);
+          form.reset();
+          await renderLogs();
+        } catch (error) {
+          console.error("Error saving log entry:", error);
+          statusElement.innerText = `Error saving entry: ${error.message}`;
+          statusElement.className = "mt-4 text-center text-sm text-red-600 font-bold";
+        }
+      };
 
-      resetBtn.addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to reset this page? This will delete all data and unlink the template.")) return;
-        await remove(ref(db, `qr_codes/${id}`));
-        await remove(ref(db, `logs/${id}`));
-        window.location.href = `./index.html?id=${encodeURIComponent(id)}`;
-      });
+      resetBtn.onclick = async () => {
+        let confirmMessage = "";
+        if (currentLogScope === 'personal') {
+          confirmMessage = "Are you sure you want to reset YOUR personal log for this item? This will delete all YOUR data for this specific QR code.";
+        } else { // 'shared'
+          confirmMessage = "Are you sure you want to reset this SHARED log for this item? This will delete ALL data for this specific QR code for EVERYONE.";
+        }
+
+        if (!confirm(confirmMessage)) {
+          console.log("Reset cancelled by user.");
+          return;
+        }
+
+        try {
+          console.log(`Attempting to remove data from: ${currentLogBasePath}`);
+          await remove(ref(db, currentLogBasePath));
+          console.log("Data removed successfully. Re-rendering logs...");
+          await renderLogs(); // Re-render after reset
+          statusElement.innerText = "Log reset successfully!";
+          statusElement.className = "mt-4 text-center text-sm text-green-600 font-bold";
+          setTimeout(() => statusElement.innerText = "", 3000);
+        } catch (error) {
+          console.error("Error resetting log:", error);
+          statusElement.innerText = `Failed to reset log: ${error.message}`;
+          statusElement.className = "mt-4 text-center text-sm text-red-600 font-bold";
+        }
+      };
     }
 
     main();
