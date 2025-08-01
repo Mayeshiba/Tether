@@ -2,17 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Generic Log</title>
+  <title>Log Entry</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div class="max-w-xl mx-auto mt-10 bg-white p-6 rounded-lg shadow">
-    <h1 class="text-2xl font-bold mb-4 text-center">Log Entry</h1>
+  <div class="max-w-xl mx-auto mt-20 bg-white p-8 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold mb-6 text-center">Log Entry</h1>
     <form id="entry-form" class="space-y-4"></form>
     <div class="text-center">
-      <button id="submit-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-2">Save Entry</button>
-      <p class="mt-4 text-red-600 text-sm cursor-pointer underline" id="reset-btn">Reset This Log</p>
+      <button id="save-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded">Save Entry</button>
+      <div class="mt-4">
+        <button id="reset-btn" class="text-red-600 text-sm underline">Reset This Log</button>
+      </div>
     </div>
     <hr class="my-6" />
     <h2 class="text-lg font-semibold mb-2">Previous Entries</h2>
@@ -21,7 +23,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, push, set, remove, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getDatabase, ref, get, push, set, remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
@@ -37,84 +39,79 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const id = new URLSearchParams(window.location.search).get("id");
-    if (!id) {
-      alert("No ID provided in URL");
-      throw new Error("Missing ID");
+    function getIdFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id") || "";
     }
 
+    const id = getIdFromURL();
     const qrRef = ref(db, `qr_codes/${id}`);
-    const entryRef = ref(db, `logs/${id}`);
     const form = document.getElementById("entry-form");
     const entriesDiv = document.getElementById("entries");
 
-    let currentLabels = [];
+    let fields = [];
 
-    async function loadTemplateAndRenderForm() {
-      const qrSnap = await get(qrRef);
-      const qrData = qrSnap.val();
-      if (!qrData?.template) {
-        alert("No template set for this ID");
+    async function loadTemplateFields() {
+      const snap = await get(qrRef);
+      const data = snap.val();
+      if (!data || !data.template) {
+        form.innerHTML = "<div class='text-red-600 font-bold'>No template found.</div>";
         return;
       }
 
-      const templateSnap = await get(ref(db, `templates/${qrData.template}`));
-      const template = templateSnap.val();
+      const templateRef = ref(db, `templates/${data.template}/fields`);
+      const templateSnap = await get(templateRef);
+      fields = templateSnap.val();
 
-      if (!template?.fields) {
-        alert("No fields found in template");
+      if (!fields) {
+        form.innerHTML = "<div class='text-red-600 font-bold'>Template data missing.</div>";
         return;
       }
-
-      const fieldsObj = template.fields;
-      currentLabels = Object.keys(fieldsObj)
-        .sort()
-        .map((key) => {
-          const field = fieldsObj[key];
-          if (typeof field === "string") return field;
-          if (field && typeof field.label === "string") return field.label;
-          return `Unnamed Field ${key}`;
-        });
 
       form.innerHTML = "";
-      currentLabels.forEach((label, i) => {
-        const inputId = `field-${i}`;
-        const fieldDiv = document.createElement("div");
-        fieldDiv.innerHTML = `
-          <label for="${inputId}" class="block font-medium">${label}</label>
-          <input type="text" id="${inputId}" class="w-full border rounded px-3 py-2 mt-1" />
+      fields.forEach((field, i) => {
+        const label = field.name || `Field ${i + 1}`;
+        form.innerHTML += `
+          <label class="block">
+            <span class="text-gray-700">${label}</span>
+            <input type="text" id="field-${i}" class="mt-1 block w-full border rounded p-2" />
+          </label>
         `;
-        form.appendChild(fieldDiv);
       });
     }
 
-    document.getElementById("submit-btn").addEventListener("click", async (e) => {
+    async function loadEntries() {
+      const logRef = ref(db, `logs/${id}`);
+      const snap = await get(logRef);
+      const entries = snap.val();
+      if (!entries) return;
+
+      entriesDiv.innerHTML = Object.values(entries).map(entry => {
+        return `<div class="p-3 bg-gray-200 rounded text-sm">${Object.values(entry).join("<br>")}</div>`;
+      }).join("");
+    }
+
+    document.getElementById("save-btn").onclick = async (e) => {
       e.preventDefault();
       const entry = {};
-      currentLabels.forEach((_, i) => {
-        entry[`field${i + 1}`] = document.getElementById(`field-${i}`).value;
+      fields.forEach((_, i) => {
+        const input = document.getElementById(`field-${i}`);
+        entry[i] = input.value;
       });
-      await push(entryRef, entry);
-      form.reset();
-    });
+      const logRef = ref(db, `logs/${id}`);
+      await push(logRef, entry);
+      location.reload();
+    };
 
-    onValue(entryRef, (snapshot) => {
-      const entries = snapshot.val() || {};
-      entriesDiv.innerHTML = Object.values(entries).map((entry) =>
-        `<div class="bg-gray-200 p-3 rounded">
-          ${Object.values(entry).map((val) => `<div>${val}</div>`).join("")}
-        </div>`).join("");
-    });
+    document.getElementById("reset-btn").onclick = async (e) => {
+      e.preventDefault();
+      await remove(ref(db, `logs/${id}`));
+      await remove(qrRef);
+      window.location.href = "/Tether/docs/index.html?id=" + encodeURIComponent(id);
+    };
 
-    document.getElementById("reset-btn").addEventListener("click", async () => {
-      if (confirm("Are you sure you want to reset this log? All data will be lost.")) {
-        await remove(entryRef);
-        await remove(qrRef);
-        window.location.href = "index.html";
-      }
-    });
-
-    loadTemplateAndRenderForm();
+    loadTemplateFields();
+    loadEntries();
   </script>
 </body>
 </html>
