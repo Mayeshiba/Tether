@@ -56,7 +56,7 @@
 
         form.innerHTML = "";
 
-        template.fields.forEach((field, idx) => {
+        Object.values(template.fields).forEach((field, idx) => {
           const wrapper = document.createElement("div");
           wrapper.className = "field-block";
 
