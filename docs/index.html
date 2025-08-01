@@ -8,7 +8,6 @@
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
   <div class="max-w-lg mx-auto mt-24 bg-white p-8 rounded-lg shadow-lg">
-    <!-- MODIFIED: Removed QR ID from title for setup mode -->
     <h1 class="text-2xl font-bold mb-6 text-center" id="page-title">Loading QR Code...</h1>
     <div id="user-status" class="text-center text-sm mb-4 text-gray-600 hidden"></div>
     <div id="app">
@@ -16,7 +15,6 @@
     </div>
   </div>
 
-  <!-- MODIFIED: Moved Admin Page link outside the main app div to prevent duplication -->
   <div class="max-w-lg mx-auto mt-8 text-center">
     <a href="./admin.html" class="text-blue-500 hover:underline">Go to Admin Page</a>
   </div>
@@ -46,7 +44,7 @@
     const pageTitle = document.getElementById("page-title");
 
     let currentQrId = null;
-    let currentUserId = null; // Will be null for shared logs, or actual UID for personal logs
+    // currentUserId will be determined by Firebase Auth and passed to generic_log.html
 
     // Function to get QR ID from URL
     function getQrIdFromURL() {
@@ -63,11 +61,10 @@
       window.location.href = url;
     }
 
-    // Function to display template selection UI for admin
+    // Function to display template selection UI for admin (only if explicitly triggered, not default)
     async function showTemplateSelectionUI(qrId) {
-      // MODIFIED: Changed title to be generic for setup, not showing QR ID
       pageTitle.textContent = `Configure New QR Code`; 
-      userStatusDiv.classList.add("hidden"); // Hide user status during setup
+      userStatusDiv.classList.add("hidden"); 
 
       const templatesSnap = await get(ref(db, "templates"));
       const templates = templatesSnap.val();
@@ -111,14 +108,12 @@
           return;
         }
 
-        // Save template and log_scope for this QR code (public association)
         await set(ref(db, `qr_codes/${qrId}`), { 
           template: selectedTemplate,
           log_scope: selectedScope
         });
         
-        // Now that scope is set, re-run the main routing logic
-        routeQrCode();
+        routeQrCode(); // Re-run routing after configuration
       };
     }
 
@@ -132,54 +127,54 @@
         return;
       }
 
-      // Try to fetch existing QR code configuration
       const qrConfigRef = ref(db, `qr_codes/${currentQrId}`);
       const qrConfigSnap = await get(qrConfigRef);
       const qrConfig = qrConfigSnap.val();
 
       if (qrConfig && qrConfig.template && qrConfig.log_scope) {
-        // QR code is already configured, proceed with routing based on log_scope
-        pageTitle.textContent = `Loading Log...`; // MODIFIED: Generic loading title
+        pageTitle.textContent = `Loading Log...`; 
         if (qrConfig.log_scope === 'personal') { // Aura
-          userStatusDiv.classList.remove("hidden"); // Show user status for personal logs
+          userStatusDiv.classList.remove("hidden"); 
           
-          // Ensure user is authenticated before redirecting for personal logs
-          if (!auth.currentUser) {
+          // Ensure user is authenticated for personal logs before redirecting
+          if (auth.currentUser) {
+            currentUserId = auth.currentUser.uid;
+            userStatusDiv.textContent = `Logged in as: ${currentUserId}`;
+            redirectToLogPage(currentQrId, currentUserId);
+          } else {
             userStatusDiv.textContent = "Signing in anonymously...";
             try {
-              await signInAnonymously(auth);
-              // After successful sign-in, auth.currentUser will be set
+              const userCredential = await signInAnonymously(auth);
+              currentUserId = userCredential.user.uid;
+              userStatusDiv.textContent = `Logged in as: ${currentUserId}`;
+              redirectToLogPage(currentQrId, currentUserId);
             } catch (error) {
               console.error("Anonymous sign-in failed during routing:", error);
               userStatusDiv.textContent = `Authentication Error: ${error.message}`;
               appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Failed to authenticate for personal log.</div>`;
-              return; // Stop execution if authentication fails
             }
           }
-          currentUserId = auth.currentUser.uid; // Now we are sure currentUserId is available
-          userStatusDiv.textContent = `Logged in as: ${currentUserId}`;
-          redirectToLogPage(currentQrId, currentUserId);
         } else if (qrConfig.log_scope === 'shared') { // Terra
-          userStatusDiv.classList.add("hidden"); // Hide user status for shared logs
-          // For shared logs, no authentication needed, redirect directly
+          userStatusDiv.classList.add("hidden"); 
           redirectToLogPage(currentQrId);
         } else {
-          // Fallback for unknown log_scope (shouldn't happen if admin sets it correctly)
           pageTitle.textContent = "Error";
           appDiv.innerHTML = `<div class="text-center text-red-600 font-bold">Error: Unknown log scope configured for this QR code.</div>`;
         }
       } else {
-        // If QR code is NOT configured (no entry in qr_codes/{id} or incomplete),
-        // automatically default to 'shared' (Terra) behavior.
-        pageTitle.textContent = `Loading Shared Log...`; // MODIFIED: Generic loading title
-        userStatusDiv.classList.add("hidden"); // Hide user status for shared logs
-        redirectToLogPage(currentQrId); // Redirect directly, no userId
+        // If QR code is NOT configured, automatically default to 'shared' (Terra) behavior.
+        pageTitle.textContent = `Loading Shared Log...`; 
+        userStatusDiv.classList.add("hidden"); 
+        redirectToLogPage(currentQrId); 
       }
     }
 
     // Initial call to start the routing process
-    // We call routeQrCode inside onAuthStateChanged to ensure Firebase Auth is initialized
+    // Ensure Firebase Auth is initialized before routing
     onAuthStateChanged(auth, (user) => {
-      routeQrCode(); // Call routeQrCode once auth state is known
+      // This listener will fire immediately if a user is already authenticated, or after signInAnonymously completes.
+      // We only want to route once, so we'll add a flag or ensure the logic handles re-entry.
+      // For simplicity, routeQrCode will handle the initial routing.
+      routeQrCode(); 
     });
   </script>
