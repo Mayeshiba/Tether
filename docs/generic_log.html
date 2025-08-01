@@ -39,21 +39,36 @@
     const status = document.getElementById("status");
 
     if (!id) {
-      form.innerHTML = '<p class="text-red-600 font-bold">Missing ID in URL</p>';
+      form.innerHTML = '<p class="text-red-600 font-bold">Error: Missing ID in URL</p>';
       submitBtn.disabled = true;
       return;
     }
 
     async function loadTemplate() {
       try {
-        const snap = await get(ref(db, `qr_codes/${id}`));
+        console.log("Attempting to load template for ID:", id);
+
+        const qrRef = ref(db, `qr_codes/${id}`);
+        const snap = await get(qrRef);
         const data = snap.val();
-        if (!data || !data.template) throw new Error("Template not found");
+        
+        if (!data || !data.template) {
+          console.error("Error: Template not found in `qr_codes` for ID:", id);
+          throw new Error("Template not configured for this QR code. Please go back and select a template.");
+        }
 
-        const templateSnap = await get(ref(db, `templates/${data.template}`));
+        console.log("Found template name:", data.template);
+
+        const templateRef = ref(db, `templates/${data.template}`);
+        const templateSnap = await get(templateRef);
         const template = templateSnap.val();
-        if (!template || !template.fields) throw new Error("Invalid template format");
+        if (!template || !template.fields) {
+          console.error("Error: Template data is invalid or fields are missing for template:", data.template);
+          throw new Error("Invalid template format found in Firebase.");
+        }
 
+        console.log("Successfully found template fields:", template.fields);
+        
         form.innerHTML = "";
 
         Object.values(template.fields).forEach((field, idx) => {
@@ -87,7 +102,8 @@
           form.appendChild(wrapper);
         });
       } catch (err) {
-        form.innerHTML = `<p class="text-red-600 font-bold">Error loading template: ${err.message}</p>`;
+        console.error("An error occurred during template loading:", err);
+        form.innerHTML = `<p class="text-red-600 font-bold">${err.message}</p>`;
         submitBtn.disabled = true;
       }
     }
