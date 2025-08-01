@@ -9,13 +9,21 @@
 <body class="bg-gray-100 min-h-screen p-4">
   <div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
     <h1 class="text-2xl font-bold mb-4 text-center">Log Entry</h1>
+
+    <!-- Display for Public Item Data -->
+    <div id="public-item-data" class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+      <h2 class="text-xl font-semibold mb-2 text-center">Item Details</h2>
+      <p class="text-center text-gray-500" id="public-data-status">Loading item details...</p>
+    </div>
+
     <form id="log-form" class="space-y-4"></form>
     <button id="submit" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Submit</button>
-    <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Template</button>
+    <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Log</button>
     <p id="status" class="mt-4 text-center text-sm text-gray-600"></p>
 
+    <!-- Container for the log history (will be "My Log History" or "Shared Log History") -->
     <div id="log-history" class="mt-8 border-t pt-4">
-      <h2 class="text-xl font-bold mb-4 text-center">Log History</h2>
+      <h2 class="text-xl font-bold mb-4 text-center" id="log-history-title">Log History</h2>
       <div id="log-list" class="space-y-4"></div>
     </div>
   </div>
@@ -42,18 +50,69 @@
     const resetBtn = document.getElementById("reset");
     const status = document.getElementById("status");
     const logList = document.getElementById("log-list");
+    const publicItemDataDiv = document.getElementById("public-item-data");
+    const publicDataStatus = document.getElementById("public-data-status");
+    const logHistoryTitle = document.getElementById("log-history-title");
 
-    async function renderLogs(id) {
+    // Global variables for log path and type, determined in main()
+    let currentLogBasePath = null;
+    let currentLogScope = null;
+    let currentQrId = null;
+    let currentUserId = null;
+
+
+    // Function to load and display public item data
+    async function loadPublicItemData(qrId) {
+      publicDataStatus.textContent = "Loading item details...";
+      try {
+        const publicRef = ref(db, `public_items_data/${qrId}`);
+        const snap = await get(publicRef);
+        const publicData = snap.val();
+
+        if (publicData) {
+          let content = '';
+          if (publicData.image_url) {
+            content += `<img src="${publicData.image_url}" alt="Item Image" class="w-full h-48 object-cover rounded-md mb-4">`;
+          }
+          if (publicData.title) {
+            content += `<h3 class="text-lg font-semibold mb-2">${publicData.title}</h3>`;
+          }
+          if (publicData.description) {
+            content += `<p class="text-sm text-gray-700 mb-2">${publicData.description}</p>`;
+          }
+          if (publicData.tasting_notes) {
+            content += `<p class="text-sm text-gray-700 mb-2"><strong>Tasting Notes:</strong> ${publicData.tasting_notes}</p>`;
+          }
+          if (publicData.website_link) {
+            content += `<a href="${publicData.website_link}" target="_blank" class="text-blue-500 hover:underline text-sm">Visit Website</a>`;
+          }
+          publicItemDataDiv.innerHTML = content;
+        } else {
+          publicItemDataDiv.innerHTML = `<p class="text-center text-gray-500">No public details found for this item.</p>`;
+        }
+      } catch (error) {
+        console.error("Error loading public item data:", error);
+        publicItemDataDiv.innerHTML = `<p class="text-center text-red-600">Error loading item details.</p>`;
+      }
+    }
+
+    // renderLogs now uses the global currentLogBasePath
+    async function renderLogs() {
+      if (!currentLogBasePath) {
+        logList.innerHTML = `<p class="text-center text-red-600">Log path not configured.</p>`;
+        return;
+      }
+
       logList.innerHTML = `<p class="text-center text-gray-500">Loading logs...</p>`;
       
       try {
-        const logsRef = ref(db, `logs/${id}`);
+        const logsRef = ref(db, currentLogBasePath);
         const snap = await get(logsRef);
         const logs = snap.val();
         logList.innerHTML = "";
 
         if (!logs) {
-          logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found.</p>`;
+          logList.innerHTML = `<p class="text-center text-gray-500">No previous logs found for this item.</p>`;
           return;
         }
 
@@ -63,7 +122,6 @@
           const logEntryDiv = document.createElement("div");
           logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
           
-          // Check if a timestamp exists and is a valid number
           let timestampText = 'N/A';
           if (log.timestamp && !isNaN(log.timestamp)) {
             timestampText = new Date(log.timestamp).toLocaleString();
@@ -87,24 +145,47 @@
     }
 
     async function main() {
-      const id = new URLSearchParams(window.location.search).get("id");
+      const urlParams = new URLSearchParams(window.location.search);
+      currentQrId = urlParams.get("id"); // This is the QR code ID
+      currentUserId = urlParams.get("userId"); // User ID might be null for shared logs
 
-      if (!id) {
-        form.innerHTML = '<p class="text-red-600 font-bold">Error: Missing ID in URL</p>';
+      if (!currentQrId) {
+        form.innerHTML = '<p class="text-red-600 font-bold">Error: Missing QR ID in URL</p>';
         submitBtn.disabled = true;
         return;
       }
 
       try {
-        const qrRef = ref(db, `qr_codes/${id}`);
+        // Load and display public item data
+        await loadPublicItemData(currentQrId);
+
+        // Get template and log_scope from Firebase
+        const qrRef = ref(db, `qr_codes/${currentQrId}`);
         const snap = await get(qrRef);
-        const data = snap.val();
+        const qrData = snap.val();
         
-        if (!data || !data.template) {
+        if (!qrData || !qrData.template) {
           throw new Error("Template not configured for this QR code. Please go back and select a template.");
         }
 
-        const templateRef = ref(db, `templates/${data.template}`);
+        currentLogScope = qrData.log_scope || 'personal'; // Default to 'personal' if not set
+        
+        // Determine the base path for saving/fetching logs
+        if (currentLogScope === 'personal') {
+          if (!currentUserId) {
+            throw new Error("User ID is missing for a personal log. Please ensure you are logged in.");
+          }
+          currentLogBasePath = `users/${currentUserId}/logs/${currentQrId}/entries`;
+          logHistoryTitle.textContent = "My Log History";
+          resetBtn.textContent = "Reset My Log";
+        } else { // 'shared' or any other value
+          currentLogBasePath = `shared_logs/${currentQrId}/entries`;
+          logHistoryTitle.textContent = "Shared Log History";
+          resetBtn.textContent = "Reset Shared Log";
+        }
+
+
+        const templateRef = ref(db, `templates/${qrData.template}`);
         const templateSnap = await get(templateRef);
         const template = templateSnap.val();
         if (!template || !template.fields) {
@@ -122,7 +203,7 @@
           label.className = "block mb-1 font-medium";
 
           let input;
-          if (field.type === "dropdown" && Array.isArray(field.options)) {
+          if (field.type === "multichoice" && Array.isArray(field.options)) {
             input = document.createElement("select");
             input.className = "w-full p-2 border rounded";
             field.options.forEach(opt => {
@@ -131,9 +212,19 @@
               option.innerText = opt;
               input.appendChild(option);
             });
-          } else {
+          } else if (field.type === "date") {
             input = document.createElement("input");
-            input.type = field.type || "text";
+            input.type = "date";
+            input.className = "w-full p-2 border rounded";
+          }
+          else if (field.type === "number") {
+            input = document.createElement("input");
+            input.type = "number";
+            input.className = "w-full p-2 border rounded";
+          }
+          else {
+            input = document.createElement("input");
+            input.type = "text"; // Default to text
             input.className = "w-full p-2 border rounded";
           }
 
@@ -144,10 +235,11 @@
           form.appendChild(wrapper);
         });
 
-        await renderLogs(id);
+        // Render logs using the determined base path
+        await renderLogs();
 
       } catch (err) {
-        console.error("An error occurred during template loading:", err);
+        console.error("An error occurred during template or public data loading:", err);
         form.innerHTML = `<p class="text-red-600 font-bold">${err.message}</p>`;
         submitBtn.disabled = true;
       }
@@ -157,21 +249,32 @@
         Array.from(form.elements).forEach(input => {
           if (input.name) entries[input.name] = input.value;
         });
-
         entries.timestamp = Date.now();
 
-        await push(ref(db, `logs/${id}`), entries);
+        // Save to the determined log base path
+        await push(ref(db, currentLogBasePath), entries);
         status.innerText = "Entry saved!";
         setTimeout(() => status.innerText = "", 3000);
         form.reset();
-        await renderLogs(id);
+        // Re-render logs
+        await renderLogs();
       });
 
       resetBtn.addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to reset this page? This will delete all data and unlink the template.")) return;
-        await remove(ref(db, `qr_codes/${id}`));
-        await remove(ref(db, `logs/${id}`));
-        window.location.href = `./index.html?id=${encodeURIComponent(id)}`;
+        let confirmMessage = "";
+        if (currentLogScope === 'personal') {
+          confirmMessage = "Are you sure you want to reset YOUR personal log for this item? This will delete all YOUR data for this specific QR code.";
+        } else {
+          confirmMessage = "Are you sure you want to reset this SHARED log for this item? This will delete ALL data for this specific QR code for EVERYONE.";
+        }
+
+        if (!confirm(confirmMessage)) return;
+        
+        // Remove data from the determined log base path
+        await remove(ref(db, currentLogBasePath));
+        
+        // Redirect back to index, passing the original ID and userId
+        window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}&userId=${encodeURIComponent(currentUserId)}`;
       });
     }
 
