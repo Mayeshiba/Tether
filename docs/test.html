@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Car Maintenance Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <h1 id="loading-state">Car Maintenance Log</h1>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getDatabase, ref, set, push, remove, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
+      measurementId: "G-X7ZQ6DJYEN"
+    };
+
+    // THIS IS THE ONLY INITIALIZATION YOU NEED!
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Try a simple test: load something from your DB
+    const loading = document.getElementById("loading-state");
+    const params = new URLSearchParams(location.search);
+    const qrId = params.get("id") || "test";
+    loading.textContent = "Trying to load: " + qrId;
+
+    const vehicleRef = ref(db, `qr_codes/${qrId}/vehicle`);
+    onValue(vehicleRef, (snapshot) => {
+      loading.textContent = "Vehicle: " + JSON.stringify(snapshot.val());
+    }, (err) => {
+      loading.textContent = "Error: " + err.message;
+    });
+  </script>
+</body>
+</html>
