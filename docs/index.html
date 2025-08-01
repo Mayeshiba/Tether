@@ -57,8 +57,8 @@ See project architecture and instructions in README.md or at the top of this fil
       const snap = await get(qrRef);
       const data = snap.val();
       if (data && data.template) {
-        // Template already chosen, redirect to template page
-        window.location.href = `/Tether/templates/${data.template}.html?id=${encodeURIComponent(id)}`;
+        // ✅ REDIRECT TO GENERIC LOG INSTEAD OF STATIC TEMPLATE
+        window.location.href = `/Tether/docs/generic_log.html?id=${encodeURIComponent(id)}`;
         return;
       }
 
@@ -89,8 +89,8 @@ See project architecture and instructions in README.md or at the top of this fil
         if (!selected) return;
         // Save choice to DB
         await set(qrRef, { template: selected });
-        // Redirect to template page
-        window.location.href = `/Tether/templates/${selected}.html?id=${encodeURIComponent(id)}`;
+        // ✅ REDIRECT TO GENERIC LOG INSTEAD OF STATIC TEMPLATE
+        window.location.href = `/Tether/docs/generic_log.html?id=${encodeURIComponent(id)}`;
       };
     }
 
