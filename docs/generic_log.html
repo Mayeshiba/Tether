@@ -48,7 +48,7 @@
     const form = document.getElementById("entry-form");
     const entriesDiv = document.getElementById("entries");
 
-    let currentFields = [];
+    let currentLabels = [];
 
     async function loadTemplateAndRenderForm() {
       const qrSnap = await get(qrRef);
@@ -66,11 +66,14 @@
         return;
       }
 
-      // Convert object of fields to array of labels
-      currentFields = Object.values(template.fields).map(f => f.label || "Unnamed Field");
+      // EXPLICITLY extract label text from each object
+      const fieldsObj = template.fields;
+      currentLabels = Object.keys(fieldsObj)
+        .sort()
+        .map(key => fieldsObj[key]?.label || `Field ${key}`);
 
       form.innerHTML = "";
-      currentFields.forEach((label, i) => {
+      currentLabels.forEach((label, i) => {
         const inputId = `field-${i}`;
         const fieldDiv = document.createElement("div");
         fieldDiv.innerHTML = `
@@ -84,7 +87,7 @@
     document.getElementById("submit-btn").addEventListener("click", async (e) => {
       e.preventDefault();
       const entry = {};
-      currentFields.forEach((_, i) => {
+      currentLabels.forEach((_, i) => {
         entry[`field${i + 1}`] = document.getElementById(`field-${i}`).value;
       });
       await push(entryRef, entry);
