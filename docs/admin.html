@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Template Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen p-4">
+  <div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4 text-center">Create a New Log Template</h1>
+
+    <label class="block mb-2 font-semibold">Template ID (no spaces):</label>
+    <input id="template-id" type="text" class="w-full p-2 border rounded mb-4" placeholder="e.g., car_maintenance" />
+
+    <label class="block mb-2 font-semibold">Template Label:</label>
+    <input id="template-label" type="text" class="w-full p-2 border rounded mb-4" placeholder="e.g., Car Maintenance Log" />
+
+    <div id="fields" class="mb-4"></div>
+
+    <button id="add-field" class="mb-6 bg-green-500 text-white px-4 py-2 rounded">+ Add Field</button>
+
+    <button id="save-template" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded w-full">Save Template to Firebase</button>
+
+    <p id="status" class="mt-4 text-center text-sm"></p>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      authDomain: "tether-71e0c.firebaseapp.com",
+      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+      projectId: "tether-71e0c",
+      storageBucket: "tether-71e0c.appspot.com",
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
+      measurementId: "G-X7ZQ6DJYEN"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const fieldsDiv = document.getElementById('fields');
+    const addFieldBtn = document.getElementById('add-field');
+    const saveBtn = document.getElementById('save-template');
+    const status = document.getElementById('status');
+
+    function createFieldBlock() {
+      const div = document.createElement('div');
+      div.className = "border p-4 rounded mb-4 bg-gray-50";
+
+      div.innerHTML = `
+        <label class="block font-semibold mb-1">Field Name:</label>
+        <input type="text" class="field-name w-full p-2 border rounded mb-2" />
+
+        <label class="block font-semibold mb-1">Field Type:</label>
+        <select class="field-type w-full p-2 border rounded mb-2">
+          <option value="text">Text</option>
+          <option value="number">Number</option>
+          <option value="dropdown">Dropdown</option>
+        </select>
+
+        <div class="options-block hidden">
+          <label class="block font-semibold mb-1">Dropdown Options (comma-separated):</label>
+          <input type="text" class="field-options w-full p-2 border rounded mb-2" placeholder="e.g., Oil Change,Tire Rotation" />
+        </div>
+
+        <button class="remove-field text-red-600 text-sm">Remove</button>
+      `;
+
+      // Toggle dropdown options
+      const typeSelect = div.querySelector('.field-type');
+      const optionsBlock = div.querySelector('.options-block');
+      typeSelect.onchange = () => {
+        optionsBlock.classList.toggle('hidden', typeSelect.value !== 'dropdown');
+      };
+
+      // Remove button
+      div.querySelector('.remove-field').onclick = () => div.remove();
+
+      fieldsDiv.appendChild(div);
+    }
+
+    addFieldBtn.onclick = () => createFieldBlock();
+
+    saveBtn.onclick = async () => {
+      const id = document.getElementById('template-id').value.trim();
+      const label = document.getElementById('template-label').value.trim();
+      if (!id || !label) {
+        status.textContent = "Please enter both template ID and label.";
+        return;
+      }
+
+      const fields = [];
+      fieldsDiv.querySelectorAll('div').forEach(div => {
+        const name = div.querySelector('.field-name').value.trim();
+        const type = div.querySelector('.field-type').value;
+        let field = { name, type };
+
+        if (type === 'dropdown') {
+          const raw = div.querySelector('.field-options').value;
+          const options = raw.split(',').map(opt => opt.trim()).filter(Boolean);
+          field.options = options;
+        }
+
+        if (name) fields.push(field);
+      });
+
+      if (!fields.length) {
+        status.textContent = "Please add at least one field.";
+        return;
+      }
+
+      const template = { label, fields };
+      await set(ref(db, `templates/${id}`), template);
+      status.textContent = "✅ Template saved successfully!";
+    };
+  </script>
+</body>
+</html>
