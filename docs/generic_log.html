@@ -63,17 +63,19 @@
           const logEntryDiv = document.createElement("div");
           logEntryDiv.className = "p-4 bg-gray-50 rounded-lg shadow-sm";
           
-          // Check if a timestamp exists, otherwise fall back to a default message
-          const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString() : 'N/A';
+          // Check if a timestamp exists and is a valid number
+          let timestampText = 'N/A';
+          if (log.timestamp && !isNaN(log.timestamp)) {
+            timestampText = new Date(log.timestamp).toLocaleString();
+          }
           
           const logDetails = Object.entries(log)
-            // Filter out the timestamp field from the details list
             .filter(([field, value]) => field !== 'timestamp')
             .map(([field, value]) => `<strong>${field}:</strong> ${value}`)
             .join("<br>");
 
           logEntryDiv.innerHTML = `
-            <p class="text-sm text-gray-400 mb-2">Logged at: ${timestamp}</p>
+            <p class="text-sm text-gray-400 mb-2">Logged at: ${timestampText}</p>
             <p class="text-gray-800">${logDetails}</p>
           `;
           logList.appendChild(logEntryDiv);
@@ -155,7 +157,7 @@
         Array.from(form.elements).forEach(input => {
           if (input.name) entries[input.name] = input.value;
         });
-        // Add a proper timestamp to the entry before pushing
+
         entries.timestamp = Date.now();
 
         await push(ref(db, `logs/${id}`), entries);
