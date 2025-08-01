@@ -36,7 +36,6 @@
       <h1 class="text-4xl font-bold text-gray-900">Car Maintenance Log</h1>
       <p id="loading-state" class="text-gray-500 mt-2">Initializing and loading data...</p>
     </header>
-
     <!-- Vehicle Info Display -->
     <div id="vehicle-summary-card" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display:none;">
       <div class="flex justify-between items-center">
@@ -48,7 +47,6 @@
         </button>
       </div>
     </div>
-    
     <div id="vehicle-info-form" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display:none;">
       <h3 class="text-xl font-semibold mb-4">Vehicle Details</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -62,7 +60,6 @@
         <button id="cancel-edit-vehicle-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg ml-2 transition duration-300">Cancel</button>
       </div>
     </div>
-
     <!-- Maintenance Log Entry Form -->
     <div id="log-form-card" class="bg-white p-6 rounded-lg shadow-md mb-6" style="display:none;">
       <h3 class="text-xl font-semibold mb-4">Add New Maintenance Entry</h3>
@@ -79,14 +76,12 @@
       <input id="note" placeholder="Add any relevant notes here..." class="p-3 border rounded-lg w-full mt-4">
       <button id="add-entry-btn" class="w-full mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">Add Entry</button>
     </div>
-
     <!-- Maintenance Log List -->
     <div id="entry-list-container" class="bg-white p-6 rounded-lg shadow-md">
       <h3 class="text-xl font-semibold mb-4">Maintenance History</h3>
       <ul id="entry-list" class="space-y-4"></ul>
       <p id="no-entries-message" class="text-gray-500 text-center py-4" style="display:none;">No maintenance entries found. Add one above!</p>
     </div>
-    
     <!-- Reset Button -->
     <div class="text-center mt-8">
       <button id="reset-btn" class="text-red-500 hover:text-red-700 font-semibold transition duration-300">
@@ -94,7 +89,6 @@
       </button>
     </div>
   </div>
-
   <!-- Modal for Confirmation -->
   <div id="confirm-modal" class="modal-backdrop" style="display:none;">
     <div class="modal-content">
@@ -106,7 +100,6 @@
       </div>
     </div>
   </div>
-
   <!-- Firebase v11+ Modular SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
