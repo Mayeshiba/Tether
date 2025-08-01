@@ -2,128 +2,139 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Log Entry</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log Entry</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div class="max-w-xl mx-auto mt-16 bg-white p-8 rounded shadow">
-    <h1 class="text-2xl font-bold mb-6 text-center">Log Entry</h1>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold text-center mb-4">Log Entry</h1>
     <form id="log-form" class="space-y-4"></form>
-    <div class="flex justify-center">
-      <button id="save-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Save Entry</button>
-    </div>
-    <div class="text-center mt-4">
-      <button id="reset-btn" class="text-red-600 text-sm">Reset This Log</button>
-    </div>
+
+    <button id="save-entry" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded w-full mt-4">
+      Save Entry
+    </button>
+
+    <p id="status" class="text-center text-sm text-gray-600 mt-2"></p>
+
+    <p id="reset-log" class="text-center text-red-600 mt-4 cursor-pointer underline">
+      Reset This Log
+    </p>
+
     <hr class="my-6" />
-    <h2 class="text-lg font-semibold mb-2">Previous Entries</h2>
-    <div id="entries" class="bg-gray-200 p-4 rounded text-sm"></div>
+
+    <h2 class="text-xl font-semibold mb-2">Previous Entries</h2>
+    <div id="log-entries" class="bg-gray-100 p-4 rounded text-sm text-gray-800 whitespace-pre-wrap"></div>
+
+    <!-- Admin Link -->
+    <div class="text-center mt-6">
+      <a href="admin.html" class="text-blue-600 underline hover:text-blue-800 font-semibold text-sm">
+        Create or Edit Templates (Admin Page)
+      </a>
+    </div>
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, push, set, remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getDatabase, ref, get, set, push, onValue, remove } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js';
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+      apiKey: "AIzaSyAzOLfTP3B_xS2fI8oSekQspOvnRLUz0",
       authDomain: "tether-71e0c.firebaseapp.com",
       databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
       projectId: "tether-71e0c",
       storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "277809008742",
-      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
-      measurementId: "G-X7ZQ6DJYEN"
+      messagingSenderId: "870809677797",
+      appId: "1:870809677797:web:146a278b27f5b663f39fe6"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const id = new URLSearchParams(window.location.search).get("id");
 
-    const form = document.getElementById("log-form");
-    const entriesDiv = document.getElementById("entries");
-    const saveBtn = document.getElementById("save-btn");
-    const resetBtn = document.getElementById("reset-btn");
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
+    const form = document.getElementById('log-form');
+    const entriesContainer = document.getElementById('log-entries');
+    const saveButton = document.getElementById('save-entry');
+    const status = document.getElementById('status');
+    const resetLink = document.getElementById('reset-log');
 
-    if (!id) {
-      document.body.innerHTML = `<p class="text-red-600 text-center font-bold mt-10">Error: No ID in URL.</p>`;
-      throw new Error("Missing ID");
-    }
+    const templateRef = ref(db, 'qr_codes/' + id);
 
-    const qrRef = ref(db, `qr_codes/${id}`);
-
-    async function loadTemplate() {
-      const qrSnap = await get(qrRef);
-      const qrData = qrSnap.val();
-      if (!qrData || !qrData.template) {
-        form.innerHTML = `<p class="text-red-600 text-center font-bold">Error: No template assigned.</p>`;
+    get(templateRef).then(snapshot => {
+      const templateName = snapshot.val();
+      if (!templateName) {
+        status.innerText = 'This QR code is not yet set up. Please select a template.';
         return;
       }
 
-      const templateSnap = await get(ref(db, `templates/${qrData.template}`));
-      const template = templateSnap.val();
+      const templateDataRef = ref(db, 'templates/' + templateName);
+      onValue(templateDataRef, (snap) => {
+        const templateData = snap.val();
+        if (!templateData || !templateData.fields) return;
+        form.innerHTML = '';
 
-      const fields = Object.values(template.fields || {});
-      if (!fields.length) {
-        form.innerHTML = `<p class="text-red-600 text-center font-bold">No fields defined in template.</p>`;
-        return;
-      }
+        templateData.fields.forEach((field, index) => {
+          const label = document.createElement('label');
+          label.className = 'block text-sm font-medium text-gray-700';
+          label.innerText = field.name || `Unnamed Field ${index}`;
 
-      fields.forEach((field, index) => {
-        const label = field.name || `Field ${index}`;
-        let inputHtml = "";
+          let input;
+          if (field.type === 'dropdown') {
+            input = document.createElement('select');
+            input.className = 'w-full border rounded px-2 py-1';
+            field.options?.forEach(opt => {
+              const option = document.createElement('option');
+              option.value = opt;
+              option.innerText = opt;
+              input.appendChild(option);
+            });
+          } else {
+            input = document.createElement('input');
+            input.type = field.type || 'text';
+            input.className = 'w-full border rounded px-2 py-1';
+          }
 
-        if (field.type === "dropdown" && Array.isArray(field.options)) {
-          inputHtml = `<select name="${field.name}" class="w-full border p-2 rounded">
-            ${field.options.map(opt => `<option value="${opt}">${opt}</option>`).join("")}
-          </select>`;
-        } else {
-          const inputType = field.type === "number" ? "number" : "text";
-          inputHtml = `<input type="${inputType}" name="${field.name}" class="w-full border p-2 rounded" />`;
+          input.name = field.name;
+          form.appendChild(label);
+          form.appendChild(input);
+        });
+      });
+    });
+
+    function loadEntries() {
+      const logsRef = ref(db, 'logs/' + id);
+      onValue(logsRef, (snapshot) => {
+        const logs = snapshot.val();
+        if (!logs) {
+          entriesContainer.innerText = 'No entries yet.';
+          return;
         }
-
-        const wrapper = document.createElement("div");
-        wrapper.innerHTML = `
-          <label class="block font-semibold mb-1">${label}</label>
-          ${inputHtml}
-        `;
-        form.appendChild(wrapper);
+        entriesContainer.innerText = Object.values(logs).map(log => Object.values(log).join('\n')).join('\n\n');
       });
     }
 
-    async function loadEntries() {
-      const logsSnap = await get(ref(db, `logs/${id}`));
-      const data = logsSnap.val();
-      if (!data) {
-        entriesDiv.innerHTML = `<p class="text-gray-500">No entries yet.</p>`;
-        return;
+    saveButton.addEventListener('click', () => {
+      const logsRef = ref(db, 'logs/' + id);
+      const newEntry = {};
+      Array.from(form.elements).forEach(input => {
+        if (input.name) newEntry[input.name] = input.value;
+      });
+      newEntry.timestamp = new Date().toISOString();
+      push(logsRef, newEntry).then(() => {
+        status.innerText = 'Saved!';
+        setTimeout(() => status.innerText = '', 2000);
+      });
+    });
+
+    resetLink.addEventListener('click', () => {
+      if (confirm("Are you sure you want to reset this log? This will delete all data.")) {
+        remove(ref(db, 'logs/' + id));
+        remove(ref(db, 'qr_codes/' + id));
+        location.href = "index.html?id=" + id;
       }
+    });
 
-      entriesDiv.innerHTML = Object.values(data).map(entry =>
-        `<div class="mb-2 p-2 bg-white rounded shadow">${Object.values(entry).join("<br/>")}</div>`
-      ).join("");
-    }
-
-    saveBtn.onclick = async (e) => {
-      e.preventDefault();
-      const entry = {};
-      Array.from(form.elements).forEach(el => {
-        if (el.name) entry[el.name] = el.value;
-      });
-      entry.timestamp = new Date().toISOString();
-      await push(ref(db, `logs/${id}`), entry);
-      form.reset();
-      loadEntries();
-    };
-
-    resetBtn.onclick = async () => {
-      if (!confirm("Are you sure you want to reset this log?")) return;
-      await remove(ref(db, `logs/${id}`));
-      await remove(ref(db, `qr_codes/${id}`));
-      window.location.href = `/Tether/docs/index.html?id=${encodeURIComponent(id)}`;
-    };
-
-    loadTemplate();
     loadEntries();
   </script>
 </body>
