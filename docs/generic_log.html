@@ -62,13 +62,15 @@
 
       const templateSnap = await get(ref(db, `templates/${qrData.template}`));
       const template = templateSnap.val();
-      if (!template || !Array.isArray(template.fields)) {
-        form.innerHTML = `<p class="text-red-600 text-center font-bold">Error loading template.</p>`;
+
+      const fields = Object.values(template.fields || {});
+      if (!fields.length) {
+        form.innerHTML = `<p class="text-red-600 text-center font-bold">No fields defined in template.</p>`;
         return;
       }
 
-      // Build the form dynamically
-      template.fields.forEach((field, index) => {
+      fields.forEach((field, index) => {
+        const label = field.name || `Field ${index}`;
         let inputHtml = "";
 
         if (field.type === "dropdown" && Array.isArray(field.options)) {
@@ -76,11 +78,10 @@
             ${field.options.map(opt => `<option value="${opt}">${opt}</option>`).join("")}
           </select>`;
         } else {
-          const type = field.type === "number" ? "number" : "text";
-          inputHtml = `<input type="${type}" name="${field.name}" class="w-full border p-2 rounded" />`;
+          const inputType = field.type === "number" ? "number" : "text";
+          inputHtml = `<input type="${inputType}" name="${field.name}" class="w-full border p-2 rounded" />`;
         }
 
-        const label = field.name || `Field ${index}`;
         const wrapper = document.createElement("div");
         wrapper.innerHTML = `
           <label class="block font-semibold mb-1">${label}</label>
