@@ -1,198 +1,149 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Car Maintenance Log - Test</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-    .hidden { display: none; }
-  </style>
-</head>
-<body class="bg-gray-100 text-gray-800">
-  <div class="container mx-auto p-4 max-w-xl">
-    <h1 class="text-3xl font-bold text-center mb-6">Car Maintenance Log</h1>
+Here’s a complete **GitHub Copilot prompt** you can use to describe the full framework of your QR sticker project from scratch. This assumes you want Copilot to help generate, debug, and complete the system — and gives it every relevant piece of context.
 
-    <!-- Vehicle Details Summary -->
-    <div id="vehicle-summary-card" class="bg-white p-4 rounded-lg shadow mb-6 hidden">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-xl font-semibold" id="vehicle-summary-text"></h2>
-        </div>
-        <button id="edit-vehicle-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
-          Edit Vehicle Details
-        </button>
-      </div>
-    </div>
+---
 
-    <!-- Vehicle Details Form -->
-    <form id="vehicle-info-form" class="bg-white p-4 rounded-lg shadow mb-6 hidden">
-      <h3 class="text-lg font-semibold mb-4">Enter Vehicle Details</h3>
-      <div class="mb-3">
-        <label for="make" class="block mb-1">Make</label>
-        <input id="make" type="text" class="p-2 border rounded w-full" required />
-      </div>
-      <div class="mb-3">
-        <label for="model" class="block mb-1">Model</label>
-        <input id="model" type="text" class="p-2 border rounded w-full" required />
-      </div>
-      <div class="mb-3">
-        <label for="year" class="block mb-1">Year</label>
-        <input id="year" type="number" min="1900" max="2100" class="p-2 border rounded w-full" required />
-      </div>
-      <div class="mb-3">
-        <label for="plate" class="block mb-1">Plate</label>
-        <input id="plate" type="text" class="p-2 border rounded w-full" required />
-      </div>
-      <div class="flex justify-end space-x-2">
-        <button type="submit" id="save-vehicle-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg">
-          Save Vehicle
-        </button>
-        <button type="button" id="cancel-edit-vehicle-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg hidden">
-          Cancel
-        </button>
-      </div>
-    </form>
+### ✅ GitHub Copilot Prompt (Paste this in a comment at the top of your main `index.html` or `README.md`)
 
-    <!-- Loading/Error Message -->
-    <p id="loading-state" class="text-center text-gray-500 mt-4"></p>
-  </div>
+/\*
+📦 **QR Sticker Web App Framework – Full Project Overview**
 
-  <!-- Firebase Modular SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+This project is a Firebase + GitHub Pages web app that dynamically responds to QR codes by loading different logging templates. The system is modular, versioned, and scalable.
 
-    // Firebase config - double checked!
-    const firebaseConfig = {
-      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
-      authDomain: "tether-71e0c.firebaseapp.com",
-      databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
-      projectId: "tether-71e0c",
-      storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "277809008742",
-      appId: "1:277809008742:web:2586a2b821d8da8f969da7",
-      measurementId: "G-X7ZQ6DJYEN"
-    };
+---
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+## 🔹 Project Architecture
 
-    // Get the id from the URL query parameter
-    function getIdFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("id") || "";
-    }
+* Hosted on **GitHub Pages** from the `/docs` folder of the repo:
+  `https://mayeshiba.github.io/Tether/`
 
-    // DOM elements
-    const vehicleSummaryCard = document.getElementById("vehicle-summary-card");
-    const vehicleSummaryText = document.getElementById("vehicle-summary-text");
-    const editVehicleBtn = document.getElementById("edit-vehicle-btn");
-    const vehicleInfoForm = document.getElementById("vehicle-info-form");
-    const makeInput = document.getElementById("make");
-    const modelInput = document.getElementById("model");
-    const yearInput = document.getElementById("year");
-    const plateInput = document.getElementById("plate");
-    const saveVehicleBtn = document.getElementById("save-vehicle-btn");
-    const cancelEditVehicleBtn = document.getElementById("cancel-edit-vehicle-btn");
-    const loadingState = document.getElementById("loading-state");
+* Uses **Firebase Realtime Database** to store:
 
-    let currentId = "";
-    let vehicleRef = null;
+  * Template selection
+  * Vehicle or entry data
+  * Reset status
+  * Future support for user ownership, settings, and versioning
 
-    // Helper functions
-    function showForm(info = {}) {
-      vehicleInfoForm.classList.remove("hidden");
-      vehicleSummaryCard.classList.add("hidden");
-      cancelEditVehicleBtn.classList.toggle("hidden", !info.make);
-      makeInput.value = info.make || "";
-      modelInput.value = info.model || "";
-      yearInput.value = info.year || "";
-      plateInput.value = info.plate || "";
-    }
+* Uses dynamic routing based on the `id` query param in the URL:
 
-    function showSummary(info) {
-      vehicleSummaryCard.classList.remove("hidden");
-      vehicleInfoForm.classList.add("hidden");
-      vehicleSummaryText.textContent = `${info.year} ${info.make} ${info.model} (Plate: ${info.plate})`;
-    }
+  * Example: `https://mayeshiba.github.io/Tether/?id=abc123`
 
-    function setLoading(msg) {
-      loadingState.textContent = msg;
-    }
+---
 
-    // Main logic
-    async function main() {
-      setLoading("Loading vehicle info...");
-      currentId = getIdFromURL();
-      if (!currentId) {
-        setLoading("Error: No QR code ID found in URL.");
-        return;
-      }
-      vehicleRef = ref(db, `qr_codes/${currentId}/vehicle`);
+## 🔹 Behavior on Page Load
 
-      // Listen for changes
-      onValue(vehicleRef, (snapshot) => {
-        const info = snapshot.val();
-        if (info && info.make && info.model && info.year && info.plate) {
-          showSummary(info);
-          setLoading("");
-        } else {
-          showForm();
-          setLoading("");
-        }
-      }, (error) => {
-        setLoading("Error loading vehicle data.");
-      });
-    }
+1. User visits the site with a URL like `?id=abc123`.
+2. `index.html` extracts the `id` value from the query.
+3. It checks Firebase at `qr_codes/{id}`:
 
-    // Save vehicle handler
-    vehicleInfoForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const info = {
-        make: makeInput.value.trim(),
-        model: modelInput.value.trim(),
-        year: yearInput.value.trim(),
-        plate: plateInput.value.trim()
-      };
-      if (!info.make || !info.model || !info.year || !info.plate) {
-        setLoading("Please fill out all fields.");
-        return;
-      }
-      setLoading("Saving...");
-      try {
-        await set(vehicleRef, info);
-        showSummary(info);
-        setLoading("");
-      } catch (err) {
-        setLoading("Error saving vehicle info.");
-      }
-    });
+   * If no data exists yet for this ID:
 
-    // Edit handler
-    editVehicleBtn.addEventListener("click", async () => {
-      try {
-        const snapshot = await get(vehicleRef);
-        showForm(snapshot.val());
-        setLoading("");
-      } catch (err) {
-        setLoading("Error loading vehicle info.");
-      }
-    });
+     * Show a dropdown of available templates (from `template_registry.json`)
+     * Save `{ template: selectedTemplate }` to `qr_codes/{id}` in Firebase
+     * Redirect to `/templates/{selectedTemplate}.html?id=abc123`
+   * If a template is already set for the ID:
 
-    // Cancel handler
-    cancelEditVehicleBtn.addEventListener("click", async () => {
-      try {
-        const snapshot = await get(vehicleRef);
-        showSummary(snapshot.val());
-        setLoading("");
-      } catch (err) {
-        setLoading("Error loading vehicle info.");
-      }
-    });
+     * Redirect directly to that template: `/templates/{template}.html?id=abc123`
 
-    main();
-  </script>
-</body>
-</html>
+---
+
+## 🔹 Behavior on Template Pages (e.g., `car_maintenance.html`)
+
+Each template page:
+
+* Extracts `id` from the URL
+* Loads the appropriate Firebase node at `qr_codes/{id}` and its `entries` subcollection
+* Displays the relevant log entries
+* Shows a form to add new entries (fields are defined by the template metadata)
+* Offers a “Reset QR Code” button that:
+
+  * Deletes all data under `qr_codes/{id}`
+  * Redirects back to the main selection screen (`/?id=abc123`)
+
+---
+
+## 🔹 Template System
+
+* Templates live in `/docs/templates/`
+* Each template is an independent HTML file
+* Shared JavaScript lives in `/docs/assets/js/` (e.g., `firebase-init.js`, `routing.js`)
+* Shared CSS lives in `/docs/assets/css/`
+* Template metadata is stored in `docs/registry/template_registry.json`
+
+### Example `template_registry.json`:
+
+```json
+{
+  "car_maintenance": {
+    "label": "Car Maintenance Log",
+    "file": "car_maintenance.html",
+    "fields": ["maintenance_type", "cost", "note"]
+  },
+  "furnace_log": {
+    "label": "Furnace Filter Log",
+    "file": "furnace_log.html",
+    "fields": ["note"]
+  }
+}
+```
+
+This registry is loaded on the homepage when no template is selected, and powers the dropdown.
+
+---
+
+## 🔹 Firebase Project Info
+
+Firebase project name: `tether - web`
+
+### Firebase Config Block:
+
+```js
+const firebaseConfig = {
+  apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
+  authDomain: "tether-71e0c.firebaseapp.com",
+  databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
+  projectId: "tether-71e0c",
+  storageBucket: "tether-71e0c.appspot.com",
+  messagingSenderId: "277809008742",
+  appId: "1:277809008742:web:2586a2b821d8da8f969da7",
+  measurementId: "G-X7ZQ6DJYEN"
+};
+```
+
+---
+
+## 🔹 Reset Behavior
+
+If the user clicks “Reset QR Code”:
+
+* Delete the entire `qr_codes/{id}` node in Firebase
+* Redirect back to the homepage with the same ID (`/?id=abc123`)
+* The page behaves as if it's a brand new code
+
+---
+
+## 🔹 Future Support
+
+The system is structured to allow future features including:
+
+* `qr_codes/{id}/settings` with `public: true/false`
+* `qr_codes/{id}/owner` for linking to Firebase Auth user ID
+* `template_version` for tracking updates to individual templates
+
+This ensures all QR codes remain stable even if templates evolve.
+
+---
+
+Please help generate or troubleshoot:
+
+* `index.html` routing logic
+* Template page entry forms
+* Firebase integration bugs
+* Reset behavior
+* Dropdown template selection from JSON
+* Proper initialization using the config above
+
+\*/
+
+---
+
+Let me know if you want a separate Copilot prompt for working on **one specific template page**, like `car_maintenance.html`.
