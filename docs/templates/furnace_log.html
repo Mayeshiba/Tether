@@ -40,18 +40,23 @@
       if (!entries || Object.keys(entries).length === 0) return `<div class="text-gray-500 text-center">No furnace events yet.</div>`;
       // Sort entries by timestamp ascending (oldest first)
       const sortedEntries = Object.values(entries).sort((a, b) => a.timestamp - b.timestamp);
-      return `<ul class="space-y-4 mt-8">
-        ${sortedEntries.map(e => `
-          <li class="p-4 border rounded">
-            <div>
-              <span class="font-bold">${e.event_type}</span>
-              <span class="ml-2 text-sm text-gray-700">${e.timestamp ? new Date(e.timestamp).toLocaleString() : ''}</span>
-            </div>
-            <div class="text-gray-700">Cost: $${e.cost || 0}</div>
-            <div class="text-gray-700">Notes: ${e.notes || ''}</div>
-          </li>
-        `).join('')}
-      </ul>`;
+      return `
+        <div class="mt-8">
+          <h2 class="text-xl font-semibold mb-4 text-center">Maintenance Log</h2>
+          <ul class="space-y-4">
+            ${sortedEntries.map(e => `
+              <li class="p-4 border rounded">
+                <div>
+                  <span class="font-bold">${e.event_type}</span>
+                  <span class="ml-2 text-sm text-gray-700">${e.timestamp ? new Date(e.timestamp).toLocaleString() : ''}</span>
+                </div>
+                <div class="text-gray-700">Cost: $${e.cost || 0}</div>
+                <div class="text-gray-700">Notes: ${e.notes || ''}</div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `;
     }
     function renderForm() {
       return `
