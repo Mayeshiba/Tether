@@ -48,7 +48,7 @@
       const data = snap.val();
 
       if (data && data.template) {
-        window.location.href = `generic_log.html?id=${encodeURIComponent(id)}`;
+        window.location.href = `./generic_log.html?id=${encodeURIComponent(id)}`;
         return;
       }
 
@@ -76,7 +76,7 @@
         const selected = document.getElementById("template-select").value;
         if (!selected) return;
         await set(qrRef, { template: selected });
-        window.location.href = `generic_log.html?id=${encodeURIComponent(id)}`;
+        window.location.href = `./generic_log.html?id=${encodeURIComponent(id)}`;
       };
     }
 
