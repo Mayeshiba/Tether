@@ -14,7 +14,7 @@
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getDatabase, ref, get, push, remove, set, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+    import { getDatabase, ref, get, push, remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
     const firebaseConfig = {
       apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
@@ -27,6 +27,7 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+
     // Get id from URL
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
@@ -34,43 +35,59 @@
       document.getElementById("app").innerHTML = `<div class="text-red-600 font-bold">Error: No QR code ID.</div>`;
       document.getElementById("reset-btn").style.display = "none";
     }
+
     // Listen for entries
-    const entriesRef = ref(db, `qr_codes/${id}/entries`);
-    const vehicleRef = ref(db, `qr_codes/${id}/vehicle`);
+    const entriesRef = ref(db, `qr_codes/${id}/car_entries`);
     function renderEntries(entries) {
-      if (!entries || Object.keys(entries).length === 0) return `<div class="text-gray-500 text-center">No maintenance entries yet.</div>`;
-      return `<ul class="space-y-4">
-        ${Object.values(entries).map(e => `
-          <li class="p-4 border rounded">
-            <div><span class="font-bold">${e.maintenance_type}</span> - $${e.cost || 0}</div>
-            <div class="text-gray-700">${e.note || ''}</div>
-            <div class="text-xs text-gray-500">${new Date(e.timestamp).toLocaleString()}</div>
-          </li>
-        `).join('')}
-      </ul>`;
+      if (!entries || Object.keys(entries).length === 0) return `<div class="text-gray-500 text-center">No car maintenance events yet.</div>`;
+      // Sort entries by timestamp ascending (oldest first)
+      const sortedEntries = Object.values(entries).sort((a, b) => a.timestamp - b.timestamp);
+      return `
+        <div class="mt-8">
+          <h2 class="text-xl font-semibold mb-4 text-center">Maintenance Log</h2>
+          <ul class="space-y-4">
+            ${sortedEntries.map(e => `
+              <li class="p-4 border rounded">
+                <div>
+                  <span class="font-bold">${e.event_type}</span>
+                  <span class="ml-2 text-sm text-gray-700">${e.timestamp ? new Date(e.timestamp).toLocaleString() : ''}</span>
+                </div>
+                <div class="text-gray-700">Odometer: ${e.odometer || 'N/A'} mi</div>
+                <div class="text-gray-700">Cost: $${e.cost || 0}</div>
+                <div class="text-gray-700">Notes: ${e.notes || ''}</div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `;
     }
     function renderForm() {
       return `
         <form id="entry-form" class="mb-6">
           <div class="mb-2">
-            <label>Type:</label>
-            <select name="maintenance_type" class="p-2 border rounded w-full">
+            <label>Event Type:</label>
+            <select name="event_type" class="p-2 border rounded w-full">
               <option>Oil Change</option>
               <option>Tire Rotation</option>
-              <option>Brake Inspection</option>
+              <option>Brake Service</option>
               <option>Battery Replacement</option>
+              <option>Inspection</option>
               <option>Other</option>
             </select>
+          </div>
+          <div class="mb-2">
+            <label>Odometer (mi):</label>
+            <input name="odometer" type="number" min="0" class="p-2 border rounded w-full" />
           </div>
           <div class="mb-2">
             <label>Cost:</label>
             <input name="cost" type="number" step="any" min="0" class="p-2 border rounded w-full" />
           </div>
           <div class="mb-2">
-            <label>Note:</label>
-            <input name="note" type="text" class="p-2 border rounded w-full" />
+            <label>Notes:</label>
+            <input name="notes" type="text" class="p-2 border rounded w-full" />
           </div>
-          <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Add Entry</button>
+          <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Add Event</button>
         </form>
       `;
     }
@@ -78,16 +95,18 @@
       get(entriesRef).then(snap => {
         const entries = snap.val();
         document.getElementById("app").innerHTML = `
-          <div id="entries-list">${renderEntries(entries)}</div>
           ${renderForm()}
+          <hr class="my-6"/>
+          <div id="entries-list">${renderEntries(entries)}</div>
         `;
         document.getElementById("entry-form").onsubmit = async (e) => {
           e.preventDefault();
           const form = e.target;
           const entry = {
-            maintenance_type: form.maintenance_type.value,
+            event_type: form.event_type.value,
+            odometer: form.odometer.value,
             cost: form.cost.value,
-            note: form.note.value,
+            notes: form.notes.value,
             timestamp: Date.now()
           };
           await push(entriesRef, entry);
