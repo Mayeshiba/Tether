@@ -51,12 +51,10 @@
       const data = snap.val();
 
       if (data && data.template) {
-        // 🔁 Use new dynamic template system
         window.location.href = `/Tether/docs/generic_log.html?id=${encodeURIComponent(id)}`;
         return;
       }
 
-      // Load template registry from Firebase (optional: fallback to local if needed)
       let registry = {};
       try {
         const resp = await fetch("/Tether/registry/template_registry.json");
@@ -66,10 +64,10 @@
         return;
       }
 
-      // Build dropdown
       const options = Object.entries(registry)
         .map(([key, meta]) => `<option value="${key}">${meta.label || key}</option>`)
         .join("");
+
       appDiv.innerHTML = `
         <div class="mb-6 text-center">
           <div class="font-semibold mb-2">Select a log template for this QR code:</div>
@@ -90,3 +88,4 @@
   </script>
 </body>
 </html>
+
