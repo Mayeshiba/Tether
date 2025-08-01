@@ -7,135 +7,110 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
-  <div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
-    <h1 class="text-2xl font-bold text-center mb-4">Log Entry</h1>
+  <div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4 text-center">Log Entry</h1>
     <form id="log-form" class="space-y-4"></form>
-
-    <button id="save-entry" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded w-full mt-4">
-      Save Entry
-    </button>
-
-    <p id="status" class="text-center text-sm text-gray-600 mt-2"></p>
-
-    <p id="reset-log" class="text-center text-red-600 mt-4 cursor-pointer underline">
-      Reset This Log
-    </p>
-
-    <hr class="my-6" />
-
-    <h2 class="text-xl font-semibold mb-2">Previous Entries</h2>
-    <div id="log-entries" class="bg-gray-100 p-4 rounded text-sm text-gray-800 whitespace-pre-wrap"></div>
-
-    <!-- Admin Link -->
-    <div class="text-center mt-6">
-      <a href="admin.html" class="text-blue-600 underline hover:text-blue-800 font-semibold text-sm">
-        Create or Edit Templates (Admin Page)
-      </a>
-    </div>
+    <button id="submit" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Submit</button>
+    <button id="reset" class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">Reset Template</button>
+    <p id="status" class="mt-4 text-center text-sm text-gray-600"></p>
   </div>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getDatabase, ref, get, set, push, onValue, remove } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getDatabase, ref, get, set, push, remove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAzOLfTP3B_xS2fI8oSekQspOvnRLUz0",
+      apiKey: "AIzaSyAZoL7FPJ8wBqz_sX81Fo5eKXpsOVrLUZ0",
       authDomain: "tether-71e0c.firebaseapp.com",
       databaseURL: "https://tether-71e0c-default-rtdb.firebaseio.com",
       projectId: "tether-71e0c",
       storageBucket: "tether-71e0c.appspot.com",
-      messagingSenderId: "870809677797",
-      appId: "1:870809677797:web:146a278b27f5b663f39fe6"
+      messagingSenderId: "277809008742",
+      appId: "1:277809008742:web:2586a2b821d8da8f969da7"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get('id');
-    const form = document.getElementById('log-form');
-    const entriesContainer = document.getElementById('log-entries');
-    const saveButton = document.getElementById('save-entry');
-    const status = document.getElementById('status');
-    const resetLink = document.getElementById('reset-log');
+    const id = new URLSearchParams(window.location.search).get("id");
+    const form = document.getElementById("log-form");
+    const submitBtn = document.getElementById("submit");
+    const resetBtn = document.getElementById("reset");
+    const status = document.getElementById("status");
 
-    const templateRef = ref(db, 'qr_codes/' + id);
+    if (!id) {
+      form.innerHTML = '<p class="text-red-600 font-bold">Missing ID in URL</p>';
+      submitBtn.disabled = true;
+      return;
+    }
 
-    get(templateRef).then(snapshot => {
-      const templateName = snapshot.val();
-      if (!templateName) {
-        status.innerText = 'This QR code is not yet set up. Please select a template.';
+    async function loadTemplate() {
+      const snap = await get(ref(db, `qr_codes/${id}`));
+      const data = snap.val();
+      if (!data || !data.template) {
+        form.innerHTML = '<p class="text-red-600 font-bold">Template not found for this ID</p>';
+        submitBtn.disabled = true;
         return;
       }
 
-      const templateDataRef = ref(db, 'templates/' + templateName);
-      onValue(templateDataRef, (snap) => {
-        const templateData = snap.val();
-        if (!templateData || !templateData.fields) return;
-        form.innerHTML = '';
+      const templateSnap = await get(ref(db, `templates/${data.template}`));
+      const template = templateSnap.val();
+      if (!template || !template.fields) {
+        form.innerHTML = '<p class="text-red-600 font-bold">Invalid template</p>';
+        submitBtn.disabled = true;
+        return;
+      }
 
-        templateData.fields.forEach((field, index) => {
-          const label = document.createElement('label');
-          label.className = 'block text-sm font-medium text-gray-700';
-          label.innerText = field.name || `Unnamed Field ${index}`;
+      template.fields.forEach((field, idx) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "field-block";
 
-          let input;
-          if (field.type === 'dropdown') {
-            input = document.createElement('select');
-            input.className = 'w-full border rounded px-2 py-1';
-            field.options?.forEach(opt => {
-              const option = document.createElement('option');
-              option.value = opt;
-              option.innerText = opt;
-              input.appendChild(option);
-            });
-          } else {
-            input = document.createElement('input');
-            input.type = field.type || 'text';
-            input.className = 'w-full border rounded px-2 py-1';
-          }
+        const label = document.createElement("label");
+        label.innerText = field.name || "Unnamed Field";
+        label.className = "block mb-1 font-medium";
 
-          input.name = field.name;
-          form.appendChild(label);
-          form.appendChild(input);
-        });
-      });
-    });
-
-    function loadEntries() {
-      const logsRef = ref(db, 'logs/' + id);
-      onValue(logsRef, (snapshot) => {
-        const logs = snapshot.val();
-        if (!logs) {
-          entriesContainer.innerText = 'No entries yet.';
-          return;
+        let input;
+        if (field.type === "dropdown" && Array.isArray(field.options)) {
+          input = document.createElement("select");
+          field.options.forEach(opt => {
+            const option = document.createElement("option");
+            option.value = opt;
+            option.innerText = opt;
+            input.appendChild(option);
+          });
+        } else {
+          input = document.createElement("input");
+          input.type = field.type || "text";
         }
-        entriesContainer.innerText = Object.values(logs).map(log => Object.values(log).join('\n')).join('\n\n');
+        input.name = field.name;
+        input.className = "w-full p-2 border rounded";
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        form.appendChild(wrapper);
       });
     }
 
-    saveButton.addEventListener('click', () => {
-      const logsRef = ref(db, 'logs/' + id);
-      const newEntry = {};
+    loadTemplate();
+
+    submitBtn.addEventListener("click", async () => {
+      const entries = {};
       Array.from(form.elements).forEach(input => {
-        if (input.name) newEntry[input.name] = input.value;
+        if (input.name) entries[input.name] = input.value;
       });
-      newEntry.timestamp = new Date().toISOString();
-      push(logsRef, newEntry).then(() => {
-        status.innerText = 'Saved!';
-        setTimeout(() => status.innerText = '', 2000);
-      });
+
+      await push(ref(db, `logs/${id}`), entries);
+      status.innerText = "Entry saved!";
+      setTimeout(() => status.innerText = "", 3000);
+      form.reset();
     });
 
-    resetLink.addEventListener('click', () => {
-      if (confirm("Are you sure you want to reset this log? This will delete all data.")) {
-        remove(ref(db, 'logs/' + id));
-        remove(ref(db, 'qr_codes/' + id));
-        location.href = "index.html?id=" + id;
-      }
+    resetBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to reset this page? This will delete all data and unlink the template.")) return;
+      await remove(ref(db, `qr_codes/${id}`));
+      await remove(ref(db, `logs/${id}`));
+      window.location.href = "/Tether/docs/index.html?id=" + encodeURIComponent(id);
     });
-
-    loadEntries();
   </script>
 </body>
 </html>
