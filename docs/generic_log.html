@@ -171,116 +171,93 @@
         const qrData = snap.val();
 
         if (!qrData || !qrData.template) {
-          // This scenario should ideally be prevented by index.html,
-          // which now forces template selection for unconfigured IDs.
-          // If it still happens, redirect back to index.html for configuration.
           console.warn("QR code not configured. Redirecting to index.html for setup.");
           window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
           return;
         }
 
-        currentLogScope = qrData.log_scope || 'shared'; // Default to shared if log_scope is missing in DB
+        currentLogScope = qrData.log_scope || 'shared';
         console.log("Determined Log Scope:", currentLogScope);
 
-        // Setup UI and log path based on scope
+        // Fetch the template for both Aura and Terra
+        const templateRef = ref(db, `templates/${qrData.template}`);
+        const templateSnap = await get(templateRef);
+        const template = templateSnap.val();
+
+        if (!template || !template.fields) {
+          throw new Error("Invalid template format found for this QR code.");
+        }
+
+        // Populate form fields based on template for BOTH Aura and Terra
+        form.innerHTML = ""; // Clear any previous content
+        Object.values(template.fields).forEach((field, idx) => {
+          const wrapper = document.createElement("div");
+          wrapper.className = "field-block";
+
+          const label = document.createElement("label");
+          label.innerText = field.name || `Field ${idx}`;
+          label.className = "block mb-1 font-medium";
+
+          let input;
+          if (field.type === "multichoice" && Array.isArray(field.options)) {
+            input = document.createElement("select");
+            input.className = "w-full p-2 border rounded";
+            field.options.forEach(opt => {
+              const option = document.createElement("option");
+              option.value = opt;
+              option.innerText = opt;
+              input.appendChild(option);
+            });
+          } else if (field.type === "date") {
+            input = document.createElement("input");
+            input.type = "date";
+            input.className = "w-full p-2 border rounded";
+          } else if (field.type === "number") {
+            input = document.createElement("input");
+            input.type = "number";
+            input.className = "w-full p-2 border rounded";
+          } else {
+            input = document.createElement("input");
+            input.type = "text";
+            input.className = "w-full p-2 border rounded";
+          }
+
+          input.name = field.name;
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(input);
+          form.appendChild(wrapper);
+        });
+
+
+        // Configure UI and data path based on scope
         if (currentLogScope === 'personal') { // Aura Code
           if (!currentUserId) {
-            console.error("User ID is missing for an Aura (personal) log. Cannot proceed.");
-            pageTitle.textContent = "Aura Log Error";
-            form.innerHTML = `
-              <p class="text-red-600 font-bold text-center">
-                Error: Your personal session could not be established. Please try scanning the QR code again from the main page.
-              </p>
-            `;
-            submitBtn.classList.add('hidden');
-            resetBtn.classList.add('hidden'); // Hide reset for now, can be enabled later for personal log reset
-            statusElement.classList.add('hidden');
-            publicItemDataDiv.classList.add('hidden'); // Ensure public data is hidden if error
-            return;
+            throw new Error("User ID is missing for a personal log. Please go back to the main page.");
           }
           currentLogBasePath = `users/${currentUserId}/logs/${currentQrId}/entries`;
+          pageTitle.textContent = "Aura Code: Personal Log";
           logHistoryTitle.textContent = "My Log History";
           resetBtn.textContent = "Reset My Log";
+          publicItemDataDiv.classList.remove('hidden'); // Show public data for Aura
+          submitBtn.classList.remove('hidden'); // Show submit for Aura
+          resetBtn.classList.remove('hidden');
+          statusElement.classList.remove('hidden');
 
-          // Render Aura (Under Construction) View
-          pageTitle.textContent = "Aura Code: Personal Log";
-          form.innerHTML = `
-            <div class="text-center py-10">
-              <h2 class="text-3xl font-bold text-purple-700 mb-4">Under Construction!</h2>
-              <p class="text-xl text-gray-700 mb-6">We're building a personalized logging experience just for you.</p>
-              <p class="text-gray-600">Check back soon for exciting updates!</p>
-            </div>
-          `;
-          submitBtn.classList.add('hidden'); // Hide submit button for Aura (under construction)
-          resetBtn.classList.remove('hidden'); // Keep reset visible for Aura to clear personal history
-          statusElement.classList.add('hidden'); // Hide status for Aura (no form submission)
-
-          await loadPublicItemData(currentQrId); // Load public data for Aura
-          await renderLogs();
+          await loadPublicItemData(currentQrId);
 
         } else { // Terra Code (Shared Log)
           currentLogBasePath = `shared_logs/${currentQrId}/entries`;
+          pageTitle.textContent = "Terra Code: Shared Log";
           logHistoryTitle.textContent = "Shared Log History";
           resetBtn.textContent = "Reset Shared Log";
-
-          // Ensure form and buttons are visible for Terra
+          publicItemDataDiv.classList.add('hidden'); // Hide public data for Terra
           submitBtn.classList.remove('hidden');
           resetBtn.classList.remove('hidden');
           statusElement.classList.remove('hidden');
-          publicItemDataDiv.classList.add('hidden'); // Public data is not relevant for Terra in this context
-
-          // Populate form fields based on template
-          const templateRef = ref(db, `templates/${qrData.template}`);
-          const templateSnap = await get(templateRef);
-          const template = templateSnap.val();
-
-          if (!template || !template.fields) {
-            throw new Error("Invalid template format found for Terra code.");
-          }
-
-          form.innerHTML = ""; // Clear any previous content
-
-          Object.values(template.fields).forEach((field, idx) => {
-            const wrapper = document.createElement("div");
-            wrapper.className = "field-block";
-
-            const label = document.createElement("label");
-            label.innerText = field.name || `Field ${idx}`;
-            label.className = "block mb-1 font-medium";
-
-            let input;
-            if (field.type === "multichoice" && Array.isArray(field.options)) {
-              input = document.createElement("select");
-              input.className = "w-full p-2 border rounded";
-              field.options.forEach(opt => {
-                const option = document.createElement("option");
-                option.value = opt;
-                option.innerText = opt;
-                input.appendChild(option);
-              });
-            } else if (field.type === "date") {
-              input = document.createElement("input");
-              input.type = "date";
-              input.className = "w-full p-2 border rounded";
-            } else if (field.type === "number") {
-              input = document.createElement("input");
-              input.type = "number";
-              input.className = "w-full p-2 border rounded";
-            } else {
-              input = document.createElement("input");
-              input.type = "text";
-              input.className = "w-full p-2 border rounded";
-            }
-
-            input.name = field.name;
-
-            wrapper.appendChild(label);
-            wrapper.appendChild(input);
-            form.appendChild(wrapper);
-          });
-
-          await renderLogs();
         }
+
+        await renderLogs();
 
       } catch (err) {
         console.error("An error occurred during log page initialization:", err);
