@@ -110,7 +110,7 @@
       if (!confirm("Are you sure you want to reset this page? This will delete all data and unlink the template.")) return;
       await remove(ref(db, `qr_codes/${id}`));
       await remove(ref(db, `logs/${id}`));
-      window.location.href = `index.html?id=${encodeURIComponent(id)}`;
+      window.location.href = `./index.html?id=${encodeURIComponent(id)}`;
     });
   </script>
 </body>
