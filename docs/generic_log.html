@@ -48,14 +48,13 @@
     let currentQrId = null;
     let currentUserId = null;
     let currentLogScope = null;
-    let currentTemplateId = null; // New variable to store the template ID
+    let currentTemplateId = null;
 
-    // currentLogBasePath will now be determined based on scope and templateId (for Aura) or qrId (for Terra)
     let currentLogBasePath = null; 
 
     // Function to load and display public item data
     async function loadPublicItemData(qrId) {
-      publicItemDataDiv.classList.remove("hidden"); // Show the public data section
+      publicItemDataDiv.classList.remove("hidden");
       publicDataStatus.textContent = "Loading item details...";
       try {
         const publicRef = ref(db, `public_items_data/${qrId}`);
@@ -81,7 +80,6 @@
           }
           publicItemDataDiv.innerHTML = content;
         } else {
-          // If no public data, just hide the section or leave it empty
           publicItemDataDiv.classList.add("hidden");
         }
       } catch (error) {
@@ -267,25 +265,31 @@
         let template = null;
         let templateIdFromQr = null;
 
-        // Determine logScope and fetch template if configured
-        if (qrData && qrData.template) {
-          currentLogScope = qrData.log_scope || 'shared';
-          templateIdFromQr = qrData.template;
-          const templateRef = ref(db, `templates/${templateIdFromQr}`);
-          const templateSnap = await get(templateRef);
-          template = templateSnap.val();
+        // If qrData or its template is missing, redirect back to index.html
+        if (!qrData || !qrData.template) {
+          console.warn(`QR code ${currentQrId} not found or template missing. Redirecting to index.html for setup.`);
+          logContentArea.innerHTML = `<p class="text-center text-gray-500">QR code not configured. Redirecting for setup...</p>`;
+          setTimeout(() => {
+            window.location.href = `./index.html?id=${encodeURIComponent(currentQrId)}`;
+          }, 1000); // Give a short delay before redirecting
+          return; // Stop further execution on this page
+        }
 
-          if (!template || !template.fields) {
-            console.warn(`Configured template '${templateIdFromQr}' for QR ID ${currentQrId} is invalid or missing. Defaulting to basic form.`);
-            template = null; // Ensure template is null for default behavior
-          }
-        } else {
-          currentLogScope = 'shared'; // Default to shared if unconfigured
-          console.log(`QR ID ${currentQrId} is unconfigured. Defaulting to Terra (shared) log.`);
+        // If we reach here, qrData and qrData.template are guaranteed to exist
+        currentLogScope = qrData.log_scope || 'shared';
+        currentTemplateId = qrData.template;
+        const templateRef = ref(db, `templates/${currentTemplateId}`);
+        const templateSnap = await get(templateRef);
+        template = templateSnap.val();
+
+        if (!template || !template.fields) {
+          console.warn(`Configured template '${currentTemplateId}' for QR ID ${currentQrId} is invalid or missing. Falling back to basic form.`);
+          // If the template itself is bad, we still proceed, but with a default form
+          template = { label: "Unknown Template", fields: [{ name: "Notes", type: "text" }] };
         }
 
         console.log("Final Determined Log Scope:", currentLogScope);
-        console.log("Template ID from QR:", templateIdFromQr);
+        console.log("Template ID from QR:", currentTemplateId);
 
         // Construct the form HTML based on the template (or default)
         let formHtml = '';
@@ -310,7 +314,6 @@
             `;
           });
         } else {
-          // Default form if no valid template is found
           formHtml = `
             <div class="field-block">
               <label for="default-notes" class="block mb-1 font-medium">Notes:</label>
@@ -345,11 +348,11 @@
         const logListElement = logContentArea.querySelector("#log-list");
 
         // Set page title and log history title based on scope and template
-        const templateLabel = template ? (template.label || templateIdFromQr) : "Unconfigured Log";
+        const templateLabel = template ? (template.label || currentTemplateId) : "Unconfigured Log";
         if (currentLogScope === 'personal') {
           pageTitle.textContent = `Aura: ${templateLabel}`;
           logHistoryTitleElement.textContent = `My ${templateLabel} History`;
-          currentLogBasePath = `users/${currentUserId}/logs/${templateIdFromQr}/entries`; // Aura path
+          currentLogBasePath = `users/${currentUserId}/logs/${currentTemplateId}/entries`; // Aura path
           publicItemDataDiv.classList.remove('hidden'); // Show public data for Aura
         } else {
           pageTitle.textContent = `Terra: ${templateLabel}`;
@@ -359,7 +362,7 @@
 
         // Setup event listeners for the dynamically created elements
         setupEventListeners(formElement, submitBtnElement, clearLogHistoryBtnElement, reconfigureQrBtnElement, statusElement, logListElement);
-        await renderLogs(logListElement, statusElement); // Pass statusElement to renderLogs for individual delete feedback
+        await renderLogs(logListElement, statusElement);
         if (currentLogScope === 'personal') {
           await loadPublicItemData(currentQrId);
         }
